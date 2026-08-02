@@ -10,9 +10,13 @@ dashboard.
    `Sujalkumar123/Revenue-Analytics-Dashboard`. Render reads
    [`render.yaml`](render.yaml) at the repo root and creates the service —
    Python runtime, `pip install -r backend/requirements.txt`, started with
-   `gunicorn backend.app:app`, plus a 1 GB persistent disk mounted at
-   `backend/data` (so synced ledger data and accounts survive redeploys —
-   without it, Render's filesystem resets on every push).
+   `gunicorn backend.app:app`. It'll ask for a **Blueprint Name** (just a
+   label, e.g. `revenue-analytics`) — branch and blueprint path are already
+   correct as `main` / blank (defaults to `render.yaml` at the root).
+   Free-tier services don't support persistent disks, so `backend/data/`
+   (synced ledger cache + local accounts) resets on every deploy/restart —
+   fine for now; move to a paid plan and mount a disk there once that
+   matters.
 2. Once it deploys, it'll have a URL like
    `https://revenue-analytics-backend.onrender.com`. Check
    `/api/health` — should return `{"ok": true, "zohoConfigured": false}`.

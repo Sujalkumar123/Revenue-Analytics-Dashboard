@@ -24,7 +24,7 @@ services:
         value: https://accounts.zoho.com
       - key: ZOHO_API_DOMAIN
         value: https://www.zohoapis.com
-    disk:
-      name: revenue-analytics-data
-      mountPath: /opt/render/project/src/backend/data
-      sizeGB: 1
+    # Free tier doesn't support persistent disks, so backend/data/ (synced
+    # ledger cache + local accounts) resets on every deploy/restart — fine
+    # for now; move to a paid plan and add a `disk:` block back once that
+    # matters (see backend/config.py's comment on why both live there).
