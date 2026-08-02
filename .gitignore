@@ -1,0 +1,10 @@
+# Real client/revenue data — this repo is public, keep it out
+data/
+
+# Source workbooks (large, contain real data)
+*.xlsx
+~$*
+
+# Misc local files
+79BE9940
+.claude/
