@@ -8,3 +8,10 @@ data/
 # Misc local files
 79BE9940
 .claude/
+
+# Backend — real secrets, synced ledger cache, local user accounts
+backend/.env
+backend/data/
+backend/users.json
+__pycache__/
+*.pyc

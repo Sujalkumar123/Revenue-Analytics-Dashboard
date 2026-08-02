@@ -8,16 +8,18 @@ role-based editing, and undo/redo.
 ## Layout
 
 ```
-frontend/     the dashboard itself — static HTML/CSS/ES-modules, no build step
-backend/      not built yet — see backend/README.md for the planned Zoho Books integration
+frontend/     the dashboard — static HTML/CSS/ES-modules, no build step
+backend/      Flask API — Zoho Books sync + real server-side auth
 ```
 
-The split exists because of what's coming next: Zoho Books API integration.
-Today the frontend fetches its ledger straight from local JSON files
-(`frontend/data/`, gitignored — real client/revenue data). Once the backend
-exists, those fetches point at a real API instead, and things that must
-never live in browser-shipped code — the Zoho client secret, refresh token,
-and real authentication — move into `backend/` where they belong.
+The frontend today still fetches its ledger straight from local JSON files
+(`frontend/data/`, gitignored — real client/revenue data) and keeps admin
+edits in `localStorage`. The backend exists to replace that: it pulls
+invoices and credit notes from Zoho Books into the same JSON shape the
+frontend already reads, and holds the things that must never live in
+browser-shipped code — the Zoho client secret/refresh token, and real
+session-based authentication. The frontend hasn't been switched over to it
+yet (see `backend/README.md` → "Not done yet").
 
 ## Running it today
 
@@ -29,5 +31,17 @@ Then open `http://localhost:8000/`. You'll need `frontend/data/consol.json`,
 `creditnotes.json` and `clientdims.json` locally — they're not in the repo
 since it's public and those files carry real business data.
 
-See [`frontend/js/`](frontend/js) for the module structure and
-[`backend/README.md`](backend/README.md) for what's planned there.
+## Running the backend
+
+```bash
+pip install -r backend/requirements.txt
+cp backend/.env.example backend/.env      # Zoho credentials, once you have them
+py -3 -m backend.app                       # serves http://localhost:8787
+```
+
+Works without Zoho credentials too — you can create the admin account, log
+in, and manage users; only `/api/sync` and the data it feeds need real
+credentials. See [`backend/README.md`](backend/README.md) for the full
+endpoint list and what's still missing.
+
+See [`frontend/js/`](frontend/js) for the frontend's module structure.
