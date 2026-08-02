@@ -12,6 +12,7 @@ import { setRender, setStartApp } from "./core/bus.js";
 import { render } from "./controller.js";
 import { renderAuthScreen, renderAccountTab, closeAcctMenu } from "./ui/auth-screens.js";
 import { openAddModal } from "./ui/add-client-modal.js";
+import { toast } from "./ui/toast.js";
 
 setRender(render);
 
@@ -113,6 +114,7 @@ function buildChrome() {
 
 /* ================= boot ================= */
 var dataLoaded = false;
+var usingSampleData = false;
 
 function startApp() {
   renderAccountTab(syncHeaderHeight);
@@ -133,25 +135,45 @@ function boot() {
   startApp();
 }
 
-function loadData() {
-  Promise.all([
-    fetch("data/consol.json").then(function (r) { return r.json(); }),
-    fetch("data/creditnotes.json").then(function (r) { return r.json(); }),
-    fetch("data/clientdims.json").then(function (r) { return r.json(); }).catch(function () { return {}; })
-  ]).then(function (res) {
-    S.consol = res[0]; S.credit = res[1]; S.dims = res[2];
-    applyAdds("consol", S.consol);
-    applyAdds("credit", S.credit);
-    readyFlag.value = true;
-    dataLoaded = true;
-    render();
-  }).catch(function (err) {
-    document.getElementById("view").innerHTML =
-      '<div class="card" style="position:static;height:auto"><div style="padding:20px;font-size:13px;line-height:1.6">' +
-      "<b>Could not load ledger data.</b><br/>This page must be served over HTTP — open " +
-      "<code>http://localhost:8000/</code> rather than double-clicking the file.<br/><br/>" +
-      esc(err.message) + "</div></div>";
+/* data/ (the real ledger) is gitignored — it never ships to a public
+   deployment. sample-data/ is a small fictional dataset that IS committed,
+   so a fresh checkout or a public deployment (e.g. Vercel) still shows a
+   working dashboard instead of a blank error screen. */
+function fetchJSON(base, name) {
+  return fetch(base + "/" + name).then(function (r) {
+    if (!r.ok) throw new Error(name + " " + r.status);
+    return r.json();
   });
+}
+function loadFrom(base) {
+  return Promise.all([
+    fetchJSON(base, "consol.json"),
+    fetchJSON(base, "creditnotes.json"),
+    fetchJSON(base, "clientdims.json").catch(function () { return {}; })
+  ]);
+}
+
+function loadData() {
+  loadFrom("data")
+    .catch(function () {
+      usingSampleData = true;
+      return loadFrom("sample-data");
+    })
+    .then(function (res) {
+      S.consol = res[0]; S.credit = res[1]; S.dims = res[2];
+      applyAdds("consol", S.consol);
+      applyAdds("credit", S.credit);
+      readyFlag.value = true;
+      dataLoaded = true;
+      render();
+      if (usingSampleData) toast("Showing sample data — the real ledger (data/) isn't present in this deployment.");
+    }).catch(function (err) {
+      document.getElementById("view").innerHTML =
+        '<div class="card" style="position:static;height:auto"><div style="padding:20px;font-size:13px;line-height:1.6">' +
+        "<b>Could not load ledger data.</b><br/>This page must be served over HTTP — open " +
+        "<code>http://localhost:8000/</code> rather than double-clicking the file.<br/><br/>" +
+        esc(err.message) + "</div></div>";
+    });
 }
 
 if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);

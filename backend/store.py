@@ -18,6 +18,7 @@ def _load():
 
 
 def _save(users):
+    config.USERS_FILE.parent.mkdir(parents=True, exist_ok=True)
     config.USERS_FILE.write_text(json.dumps(users, indent=2), encoding="utf-8")
 
 

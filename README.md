@@ -29,7 +29,9 @@ py -3 frontend/serve.py
 
 Then open `http://localhost:8000/`. You'll need `frontend/data/consol.json`,
 `creditnotes.json` and `clientdims.json` locally — they're not in the repo
-since it's public and those files carry real business data.
+since it's public and those files carry real business data. Without them,
+the app automatically falls back to the fictional dataset in
+`frontend/sample-data/`.
 
 ## Running the backend
 
@@ -44,4 +46,6 @@ in, and manage users; only `/api/sync` and the data it feeds need real
 credentials. See [`backend/README.md`](backend/README.md) for the full
 endpoint list and what's still missing.
 
-See [`frontend/js/`](frontend/js) for the frontend's module structure.
+See [`frontend/js/`](frontend/js) for the frontend's module structure, and
+[`DEPLOY.md`](DEPLOY.md) for hosting the backend on Render and the frontend
+on Vercel.

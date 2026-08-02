@@ -21,7 +21,11 @@ from .api.ledger import bp as ledger_bp
 def create_app():
     app = Flask(__name__)
     app.config["SECRET_KEY"] = config.SECRET_KEY
-    app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+    if config.COOKIE_CROSS_SITE:
+        app.config["SESSION_COOKIE_SAMESITE"] = "None"
+        app.config["SESSION_COOKIE_SECURE"] = True
+    else:
+        app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 
     CORS(app, supports_credentials=True, origins=config.FRONTEND_ORIGINS)
 

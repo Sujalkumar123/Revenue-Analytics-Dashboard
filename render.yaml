@@ -1,0 +1,30 @@
+services:
+  - type: web
+    name: revenue-analytics-backend
+    runtime: python
+    plan: free
+    buildCommand: pip install -r backend/requirements.txt
+    startCommand: gunicorn backend.app:app --bind 0.0.0.0:$PORT
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: FRONTEND_ORIGIN
+        value: https://REPLACE-WITH-YOUR-VERCEL-URL.vercel.app
+      - key: COOKIE_CROSS_SITE
+        value: "true"
+      - key: ZOHO_CLIENT_ID
+        sync: false
+      - key: ZOHO_CLIENT_SECRET
+        sync: false
+      - key: ZOHO_REFRESH_TOKEN
+        sync: false
+      - key: ZOHO_ORGANIZATION_ID
+        sync: false
+      - key: ZOHO_ACCOUNTS_DOMAIN
+        value: https://accounts.zoho.com
+      - key: ZOHO_API_DOMAIN
+        value: https://www.zohoapis.com
+    disk:
+      name: revenue-analytics-data
+      mountPath: /opt/render/project/src/backend/data
+      sizeGB: 1
