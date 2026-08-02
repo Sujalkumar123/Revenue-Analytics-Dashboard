@@ -1,10 +1,13 @@
-"""Dev server for the Revenue Analytics dashboard.
+"""Dev server for the Revenue Analytics frontend.
 
-Run:  py -3 serve.py        then open http://localhost:8000/
+Run:  py -3 frontend/serve.py        then open http://localhost:8000/
 
-Sends no-cache headers so edits to index.html / app.js show up on a plain
-refresh (the stock http.server caches aggressively, which silently serves
-stale CSS and JS).
+Serves this directory (frontend/) — index.html, css/, js/ and the local
+data/ ledger — with no-cache headers so edits show up on a plain refresh
+(the stock http.server caches aggressively, which silently serves stale
+CSS and JS). This is a static-file dev server only; once the backend/
+Zoho Books integration exists, data/ will be served by that API instead
+and this file will just serve the static frontend assets.
 """
 import http.server
 import socketserver
