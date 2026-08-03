@@ -1,9 +1,3 @@
-# Real client/revenue data — this repo is public, keep it out.
-# Anchored paths only — an unanchored "data/" here previously matched EVERY
-# directory named "data" anywhere in the repo, including frontend/js/data/
-# (real source code), which silently never got committed.
-/frontend/data/
-
 # Source workbooks (large, contain real data)
 *.xlsx
 ~$*

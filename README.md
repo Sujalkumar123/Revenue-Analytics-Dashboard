@@ -13,13 +13,18 @@ backend/      Flask API — Zoho Books sync + real server-side auth
 ```
 
 The frontend today still fetches its ledger straight from local JSON files
-(`frontend/data/`, gitignored — real client/revenue data) and keeps admin
-edits in `localStorage`. The backend exists to replace that: it pulls
-invoices and credit notes from Zoho Books into the same JSON shape the
-frontend already reads, and holds the things that must never live in
-browser-shipped code — the Zoho client secret/refresh token, and real
-session-based authentication. The frontend hasn't been switched over to it
-yet (see `backend/README.md` → "Not done yet").
+(`frontend/data/`) and keeps admin edits in `localStorage`. The backend
+exists to replace that: it pulls invoices and credit notes from Zoho Books
+into the same JSON shape the frontend already reads, and holds the things
+that must never live in browser-shipped code — the Zoho client
+secret/refresh token, and real session-based authentication. The frontend
+hasn't been switched over to it yet (see `backend/README.md` → "Not done
+yet").
+
+**`frontend/data/` contains real client names and revenue figures and is
+committed to this repo at the owner's explicit request — it is public.** If
+that data shouldn't be public, remove it and restore a `frontend/data/`
+gitignore entry before pushing further.
 
 ## Running it today
 
@@ -27,10 +32,8 @@ yet (see `backend/README.md` → "Not done yet").
 py -3 frontend/serve.py
 ```
 
-Then open `http://localhost:8000/`. You'll need `frontend/data/consol.json`,
-`creditnotes.json` and `clientdims.json` locally — they're not in the repo
-since it's public and those files carry real business data. Without them,
-the app automatically falls back to the fictional dataset in
+Then open `http://localhost:8000/`. If `frontend/data/` is ever missing
+locally, the app automatically falls back to the fictional dataset in
 `frontend/sample-data/`.
 
 ## Running the backend
