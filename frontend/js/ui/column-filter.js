@@ -16,7 +16,7 @@ document.addEventListener("keydown", function (e) { if (e.key === "Escape") clos
 
 /* uniqueValuesFn(colKey) -> string[] (already deduped, unsorted is fine).
    onApply(colKey, selectedSet|null) -> null means "no filter" (all values). */
-export function attachColumnFilters(theadRow, columns, state, onSort, onFilter, uniqueValuesFn) {
+export function attachColumnFilters(theadRow, state, onSort, onFilter, uniqueValuesFn) {
   theadRow.querySelectorAll("th[data-colkey]").forEach(function (th) {
     var key = th.getAttribute("data-colkey");
     var btn = th.querySelector(".colf-btn");
@@ -25,13 +25,12 @@ export function attachColumnFilters(theadRow, columns, state, onSort, onFilter, 
       e.stopPropagation();
       if (openPopover && openPopover.dataset.col === key) { closePopover(); return; }
       closePopover();
-      openFilterPopover(th, key, columns, state, onSort, onFilter, uniqueValuesFn);
+      openFilterPopover(th, key, state, onSort, onFilter, uniqueValuesFn);
     });
   });
 }
 
-function openFilterPopover(th, key, columns, state, onSort, onFilter, uniqueValuesFn) {
-  var col = columns.filter(function (c) { return c.key === key; })[0];
+function openFilterPopover(th, key, state, onSort, onFilter, uniqueValuesFn) {
   var values = uniqueValuesFn(key);
   var activeSet = state.filters[key]; // Set|undefined (undefined = all pass)
 
@@ -62,7 +61,6 @@ function openFilterPopover(th, key, columns, state, onSort, onFilter, uniqueValu
     var ft = (filterText || "").toLowerCase();
     var shown = values.filter(function (v) { return v.toLowerCase().indexOf(ft) !== -1; });
     listEl.innerHTML = shown.map(function (v) {
-      var id = "cf_" + btoa(unescape(encodeURIComponent(v))).replace(/[^a-zA-Z0-9]/g, "");
       return '<label class="colf-item"><input type="checkbox" data-val="' + v.replace(/"/g, "&quot;") +
         '" ' + (checked.has(v) ? "checked" : "") + " /> " +
         (v === "" ? '<i style="color:var(--ink-3)">(blank)</i>' : v.replace(/&/g, "&amp;").replace(/</g, "&lt;")) +
@@ -79,7 +77,16 @@ function openFilterPopover(th, key, columns, state, onSort, onFilter, uniqueValu
   }
   paintList("");
 
-  pop.querySelector(".colf-search").addEventListener("input", function (e) { paintList(e.target.value); });
+  /* Matches Excel: typing a search term doesn't just narrow the visible
+     list, it also selects exactly the matching values (so Search + OK
+     filters straight to what you typed, without an extra "check all"
+     step) — clearing the search box back to empty restores every value. */
+  pop.querySelector(".colf-search").addEventListener("input", function (e) {
+    var ft = e.target.value.toLowerCase();
+    var shown = values.filter(function (v) { return v.toLowerCase().indexOf(ft) !== -1; });
+    checked = ft ? new Set(shown) : new Set(values);
+    paintList(e.target.value);
+  });
   allBox.addEventListener("change", function () {
     var ft = pop.querySelector(".colf-search").value.toLowerCase();
     var shown = values.filter(function (v) { return v.toLowerCase().indexOf(ft) !== -1; });

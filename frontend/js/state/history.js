@@ -5,7 +5,6 @@
    which sheet it was on. */
 "use strict";
 
-import { canEdit } from "./auth.js";
 import { render } from "../core/bus.js";
 import { toast } from "../ui/toast.js";
 
@@ -32,19 +31,27 @@ function redo() {
 export var HISTORY = {
   perform: perform, undo: undo, redo: redo,
   canUndo: function () { return idx >= 0; },
-  canRedo: function () { return idx + 1 < stack.length; }
+  canRedo: function () { return idx + 1 < stack.length; },
+  /* Undo/redo isn't admin-gated (see runUndo/runRedo below), so a
+     different user signing in on the same browser tab must not inherit —
+     or be able to undo — the previous session's history. Called on logout. */
+  clearSession: function () { stack = []; idx = -1; }
 };
 
 /* Shared by the keyboard shortcuts and the toolbar Undo/Redo buttons, so
-   both paths behave identically (re-render, toast, respect canEdit()). */
+   both paths behave identically (re-render, toast). Not gated by canEdit():
+   the stack is local to this browser session, and read-only users can only
+   ever push filter/sort actions onto it (they're blocked from editing
+   anywhere in the UI) — so there's nothing here for a non-admin to undo
+   except their own filtering, which they should be able to. */
 export function runUndo() {
-  if (!canEdit() || !HISTORY.canUndo()) return;
+  if (!HISTORY.canUndo()) return;
   var a = HISTORY.undo();
   render();
   if (a) toast("Undid: " + a.label);
 }
 export function runRedo() {
-  if (!canEdit() || !HISTORY.canRedo()) return;
+  if (!HISTORY.canRedo()) return;
   var a = HISTORY.redo();
   render();
   if (a) toast("Redid: " + a.label);

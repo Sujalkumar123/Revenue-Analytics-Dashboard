@@ -13,13 +13,23 @@ import { kpiCard, toolbarControlsHTML, wireSearchSort, MONTH_W } from "./toolbar
 import { loadMoreHTML, attachInfinite } from "./infinite-scroll.js";
 import { SEL } from "./selection.js";
 import { render } from "../core/bus.js";
+import { attachColumnFilters } from "./column-filter.js";
+
+/* One filter/sort state per sheet (consol vs credit), so filtering Consol
+   Sheet doesn't affect Credit Notes — persists across tab switches, like a
+   spreadsheet, until "Clear filters" or Ctrl+Z. */
+var vstateBySheet = {};
+function getVstate(sheet) {
+  return vstateBySheet[sheet] || (vstateBySheet[sheet] = { filters: {}, sort: null });
+}
 
 export function renderLedger(opts) {
   var ds = opts.ds, sheet = opts.sheet;
+  var vstate = getVstate(sheet);
   var months = fyMonths(curFY());
   var term = state.search.trim().toLowerCase();
 
-  var idx = [];
+  var baseIdx = [];
   for (var i = 0; i < ds.rows.length; i++) {
     if (opts.filter && !opts.filter(ds, sheet, i)) continue;
     if (state.flagOnly && effPeriod(ds, sheet, i)) continue;
@@ -28,7 +38,26 @@ export function renderLedger(opts) {
         fieldVal(ds, sheet, i, "item") + " " + fieldVal(ds, sheet, i, "desc")).toLowerCase();
       if (hay.indexOf(term) === -1) continue;
     }
-    idx.push(i);
+    baseIdx.push(i);
+  }
+
+  var idx = baseIdx;
+  var activeFilterKeys = Object.keys(vstate.filters).filter(function (k) { return vstate.filters[k]; });
+  if (activeFilterKeys.length) {
+    idx = idx.filter(function (ri) {
+      return activeFilterKeys.every(function (key) {
+        return vstate.filters[key].has(String(fieldVal(ds, sheet, ri, key)));
+      });
+    });
+  }
+  if (vstate.sort) {
+    var sortCol = opts.cols.filter(function (c) { return c.f === vstate.sort.col; })[0];
+    var dir = vstate.sort.dir === "desc" ? -1 : 1;
+    idx = idx.slice().sort(function (a, b) {
+      var av = fieldVal(ds, sheet, a, vstate.sort.col), bv = fieldVal(ds, sheet, b, vstate.sort.col);
+      if (sortCol && sortCol.num) return ((parseFloat(av) || 0) - (parseFloat(bv) || 0)) * dir;
+      return String(av).localeCompare(String(bv)) * dir;
+    });
   }
 
   var colTot = new Array(months.length).fill(0), grand = 0, flagged = 0, added = 0;
@@ -62,6 +91,7 @@ export function renderLedger(opts) {
     (flagged ? '<button class="icon-btn" id="onlyFlag" style="border-color:var(--gold);color:var(--gold)">' +
       (state.flagOnly ? "✓ " : "") + "Needs attention (" + flagged + ")</button>" : "") +
     (edits && !locked ? '<button class="icon-btn" id="clrEdits">Reset ' + edits + " edit(s)</button>" : "") +
+    (activeFilterKeys.length ? '<button class="icon-btn" id="clrFilters">Clear ' + activeFilterKeys.length + " filter(s)</button>" : "") +
     toolbarControlsHTML() + "</div>";
 
   var cols = locked
@@ -70,7 +100,10 @@ export function renderLedger(opts) {
   html += '<div class="grid-wrap' + (locked ? " locked" : "") + '" id="gw"><table class="grid"><thead><tr class="hdr-row">' +
     '<th class="rownum" style="width:38px"></th>' +
     cols.map(function (c, ci) {
-      return '<th style="width:' + c.w + 'px" class="' + (c.num ? "num" : "lbl") + (ci === 0 ? " sticky-l" : "") + '">' + esc(c.label) + "</th>";
+      var active = vstate.filters[c.f];
+      return '<th data-colkey="' + c.f + '" style="width:' + c.w + 'px" class="' + (c.num ? "num" : "lbl") + (ci === 0 ? " sticky-l" : "") + '">' +
+        '<span class="colf-hd"><span class="colf-lbl">' + esc(c.label) + '</span>' +
+        '<button class="colf-btn' + (active ? " active" : "") + '" title="Filter / sort ' + esc(c.label) + '">▾</button></span></th>';
     }).join("") +
     months.map(function (m) { return '<th class="num" style="width:' + MONTH_W + 'px" title="Click to select this column · Ctrl+click to add another">' + m.label + "</th>"; }).join("") +
     '<th class="num" style="width:130px">FY Total</th></tr>' +
@@ -164,7 +197,46 @@ export function renderLedger(opts) {
   });
   var of = view.querySelector("#onlyFlag");
   if (of) of.addEventListener("click", function () { state.flagOnly = !state.flagOnly; render(); });
+  var clrF = view.querySelector("#clrFilters");
+  if (clrF) clrF.addEventListener("click", function () {
+    var prev = vstate.filters;
+    HISTORY.perform({
+      label: "clear filters",
+      apply: function () { vstate.filters = {}; },
+      revert: function () { vstate.filters = prev; }
+    });
+    render();
+  });
   wireSearchSort(view);
+
+  attachColumnFilters(view.querySelector("thead tr.hdr-row"), vstate,
+    function onSort(key, dir) {
+      var prev = vstate.sort, next = { col: key, dir: dir };
+      HISTORY.perform({
+        label: "sort by " + key,
+        apply: function () { vstate.sort = next; },
+        revert: function () { vstate.sort = prev; }
+      });
+      render();
+    },
+    function onFilterApply(key, set) {
+      var prev = vstate.filters[key];
+      HISTORY.perform({
+        label: "filter " + key,
+        apply: function () { if (set) vstate.filters[key] = set; else delete vstate.filters[key]; },
+        revert: function () { if (prev) vstate.filters[key] = prev; else delete vstate.filters[key]; }
+      });
+      render();
+    },
+    function uniqueValuesFn(key) {
+      var seen = {}, out = [];
+      baseIdx.forEach(function (ri) {
+        var v = String(fieldVal(ds, sheet, ri, key));
+        if (!seen[v]) { seen[v] = 1; out.push(v); }
+      });
+      return out.sort();
+    }
+  );
 
   window.__csv = function () {
     var lines = [cols.map(function (c) { return c.label; })

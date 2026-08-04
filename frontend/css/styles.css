@@ -201,10 +201,16 @@ table.grid thead tr.hdr-row th:hover{color:var(--accent)}
 /* Excel-style per-column filter: small funnel button in each header cell */
 .colf-hd{display:flex;align-items:center;justify-content:space-between;gap:4px;width:100%}
 .colf-lbl{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.colf-btn{flex:none;background:none;border:none;color:var(--ink-3);cursor:pointer;font-size:9px;
-  padding:2px 3px;border-radius:4px;line-height:1;font-family:inherit}
+.colf-btn{flex:none;position:relative;background:none;border:none;color:var(--ink-3);cursor:pointer;
+  font-size:9px;padding:2px 3px;border-radius:4px;line-height:1;font-family:inherit}
 .colf-btn:hover{color:var(--accent);background:var(--accent-soft)}
 .colf-btn.active{color:var(--accent);background:var(--accent-soft)}
+/* tiny dot, top-right corner of the funnel button — the "a filter is
+   applied here" sign, small enough it never competes with the header label */
+.colf-btn.active::after{
+  content:"";position:absolute;top:-1px;right:-1px;width:5px;height:5px;border-radius:50%;
+  background:var(--accent);box-shadow:0 0 0 1.5px var(--surface-3);
+}
 .colf-pop{
   position:fixed;z-index:95;width:230px;max-height:340px;display:flex;flex-direction:column;
   background:var(--panel);border:1px solid var(--border-strong);border-radius:11px;

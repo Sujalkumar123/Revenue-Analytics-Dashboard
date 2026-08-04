@@ -2,6 +2,7 @@
 
 import { esc } from "../core/format.js";
 import { AUTH } from "../state/auth.js";
+import { HISTORY } from "../state/history.js";
 import { startApp } from "../core/bus.js";
 import { toast } from "./toast.js";
 
@@ -126,6 +127,7 @@ export function renderAccountTab(syncHeaderHeight) {
 
   slot.querySelector("#logoutBtn").addEventListener("click", function () {
     AUTH.logout();
+    HISTORY.clearSession();
     document.getElementById("view").innerHTML = "";
     renderAccountTab(syncHeaderHeight);
     renderAuthScreen();

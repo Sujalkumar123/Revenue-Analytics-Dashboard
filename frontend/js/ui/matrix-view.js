@@ -15,8 +15,19 @@ import { kpiCard, toolbarControlsHTML, wireSearchSort, MONTH_W } from "./toolbar
 import { loadMoreHTML, attachInfinite } from "./infinite-scroll.js";
 import { SEL } from "./selection.js";
 import { render } from "../core/bus.js";
+import { attachColumnFilters } from "./column-filter.js";
+
+/* One filter/sort state per tab (recurr, onetime, each product tab), keyed
+   by state.tab so switching tabs doesn't leak one tab's client filter into
+   another's. Only the Client column is filterable here — month columns are
+   computed revenue figures, not natural filter targets. */
+var vstateByTab = {};
+function getVstate(tab) {
+  return vstateByTab[tab] || (vstateByTab[tab] = { filters: {}, sort: null });
+}
 
 export function renderMatrix(opts) {
+  var vstate = getVstate(state.tab);
   var months = fyMonths(curFY());
   var gross = aggregate(S.consol, "consol", months, opts.filter);
   var credit = opts.netable ? aggregate(S.credit, "credit", months, opts.filter) : new Map();
@@ -55,6 +66,16 @@ export function renderMatrix(opts) {
       ? function (a, b) { return a.total - b.total; }
       : function (a, b) { return b.total - a.total; });
 
+  /* Column-filter's own sort (from the header funnel) overrides the
+     toolbar's sort dropdown when set — last sort action wins, like Excel. */
+  if (vstate.sort) {
+    var cfDir = vstate.sort.dir === "desc" ? -1 : 1;
+    rows.sort(function (a, b) { return a.name.localeCompare(b.name) * cfDir; });
+  }
+  if (vstate.filters.name) {
+    rows = rows.filter(function (r) { return vstate.filters.name.has(r.name); });
+  }
+
   var colTot = months.map(function (_, i) {
     return rows.reduce(function (s, r) { return s + r.vals[i]; }, 0);
   });
@@ -86,10 +107,14 @@ export function renderMatrix(opts) {
     (editable
       ? (mxCount() ? '<button class="icon-btn" id="clrMx">Reset ' + mxCount() + " override(s)</button>" : "")
       : '<span class="badge-lock">🔒 ' + (opts.editable ? "Read-only access" : "Derived — read-only") + "</span>") +
+    (vstate.filters.name ? '<button class="icon-btn" id="clrFilters">Clear filter</button>' : "") +
     toolbarControlsHTML() + "</div>";
 
   html += '<div class="grid-wrap" id="gw"><table class="grid"><thead>' +
-    '<tr class="hdr-row"><th class="rownum" style="width:38px"></th><th class="lbl sticky-l" style="width:300px">Client</th>' +
+    '<tr class="hdr-row"><th class="rownum" style="width:38px"></th>' +
+    '<th class="lbl sticky-l" style="width:300px" data-colkey="name">' +
+    '<span class="colf-hd"><span class="colf-lbl">Client</span>' +
+    '<button class="colf-btn' + (vstate.filters.name ? " active" : "") + '" title="Filter / sort Client">▾</button></span></th>' +
     months.map(function (m) { return '<th class="num" style="width:' + MONTH_W + 'px" title="Click to select this column · Ctrl+click to add another">' + m.label + "</th>"; }).join("") +
     '<th class="num" style="width:130px">FY Total</th></tr>' +
     '<tr class="total-row"><th class="rownum"></th><th class="lbl sticky-l"></th>' +
@@ -176,6 +201,39 @@ export function renderMatrix(opts) {
     b.addEventListener("click", function () { state.metric = b.getAttribute("data-metric"); render(); });
   });
   wireSearchSort(view);
+
+  var clrF = view.querySelector("#clrFilters");
+  if (clrF) clrF.addEventListener("click", function () {
+    var prev = vstate.filters.name;
+    HISTORY.perform({
+      label: "clear client filter",
+      apply: function () { delete vstate.filters.name; },
+      revert: function () { vstate.filters.name = prev; }
+    });
+    render();
+  });
+  attachColumnFilters(view.querySelector("thead tr.hdr-row"), vstate,
+    function onSort(key, dir) {
+      var prev = vstate.sort, next = { col: key, dir: dir };
+      HISTORY.perform({
+        label: "sort by client",
+        apply: function () { vstate.sort = next; },
+        revert: function () { vstate.sort = prev; }
+      });
+      render();
+    },
+    function onFilterApply(key, set) {
+      var prev = vstate.filters[key];
+      HISTORY.perform({
+        label: "filter client",
+        apply: function () { if (set) vstate.filters[key] = set; else delete vstate.filters[key]; },
+        revert: function () { if (prev) vstate.filters[key] = prev; else delete vstate.filters[key]; }
+      });
+      render();
+    },
+    function uniqueValuesFn() { return Array.from(names).sort(); }
+  );
+
   window.__csv = function () { return matrixCSV(months, rows, colTot, grand, opts.title); };
 }
 

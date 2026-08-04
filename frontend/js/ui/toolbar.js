@@ -15,19 +15,29 @@ export function kpiCard(k, v, s, cls) {
 
 export function toolbarControlsHTML() {
   return '<span class="tb-right">' +
-    (canEdit()
-      ? '<span class="undo-redo">' +
-        '<button class="icon-btn" id="undoBtn" title="Undo (Ctrl+Z)"' + (HISTORY.canUndo() ? "" : " disabled") + ">↺</button>" +
-        '<button class="icon-btn" id="redoBtn" title="Redo (Ctrl+U, or Ctrl+Shift+Z)"' + (HISTORY.canRedo() ? "" : " disabled") + ">↻</button>" +
-        "</span>" +
-        '<button class="btn-primary" id="addBtn" title="Add a new client line">+ Add client</button>'
-      : "") +
+    /* Undo/redo isn't admin-only — filtering/sorting (also on the shared
+       HISTORY stack) is something every role can do and undo. Only adding
+       a client is an actual data edit, gated to admins. */
+    '<span class="undo-redo">' +
+    '<button class="icon-btn" id="undoBtn" title="Undo (Ctrl+Z)"' + (HISTORY.canUndo() ? "" : " disabled") + ">↺</button>" +
+    '<button class="icon-btn" id="redoBtn" title="Redo (Ctrl+U, or Ctrl+Shift+Z)"' + (HISTORY.canRedo() ? "" : " disabled") + ">↻</button>" +
+    "</span>" +
+    (canEdit() ? '<button class="btn-primary" id="addBtn" title="Add a new client line">+ Add client</button>' : "") +
     '<select id="fySel" title="Financial year">' +
     FYS.map(function (f) {
       return '<option value="' + f.id + '"' + (f.id === state.fy ? " selected" : "") + ">" + f.label + "</option>";
     }).join("") +
     "</select>" +
     '<button class="icon-btn" id="exportBtn" title="Download this view as CSV">↓ CSV</button>' +
+    "</span>";
+}
+
+/* Standalone undo/redo cluster for toolbars that don't use the full
+   toolbarControlsHTML() (no FY select / add-client) — e.g. Invoice Dump. */
+export function undoRedoHTML() {
+  return '<span class="undo-redo">' +
+    '<button class="icon-btn" id="undoBtn" title="Undo (Ctrl+Z)"' + (HISTORY.canUndo() ? "" : " disabled") + ">↺</button>" +
+    '<button class="icon-btn" id="redoBtn" title="Redo (Ctrl+U, or Ctrl+Shift+Z)"' + (HISTORY.canRedo() ? "" : " disabled") + ">↻</button>" +
     "</span>";
 }
 

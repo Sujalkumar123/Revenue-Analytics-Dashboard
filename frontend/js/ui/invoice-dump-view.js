@@ -6,10 +6,12 @@
 
 import { esc, inr } from "../core/format.js";
 import { S } from "../state/app-state.js";
-import { kpiCard } from "./toolbar.js";
+import { kpiCard, undoRedoHTML } from "./toolbar.js";
 import { loadMoreHTML, attachInfinite } from "./infinite-scroll.js";
 import { SEL } from "./selection.js";
 import { attachColumnFilters } from "./column-filter.js";
+import { HISTORY } from "../state/history.js";
+import { render } from "../core/bus.js";
 
 export var INVOICE_DUMP_COLS = [
   { key: "invdate", label: "Invoice Date", w: 100 },
@@ -88,7 +90,7 @@ export function renderInvoiceDump() {
     '<input type="search" id="idq" placeholder="Search invoice no, client, item, GSTIN, PO, SO…" value="' + esc(vstate.search) + '" />' +
     '<span class="badge-lock">🔒 Read-only — raw export from Zoho Books</span>' +
     (activeFilterCount ? '<button class="icon-btn" id="idClrFilters">Clear ' + activeFilterCount + " filter(s)</button>" : "") +
-    '<span class="tb-right"><button class="icon-btn" id="idExport">↓ CSV</button></span>' +
+    '<span class="tb-right">' + undoRedoHTML() + '<button class="icon-btn" id="idExport">↓ CSV</button></span>' +
     "</div>";
 
   html += '<div class="grid-wrap" id="gw"><table class="grid"><thead><tr class="hdr-row">' +
@@ -129,11 +131,25 @@ export function renderInvoiceDump() {
     SEL.attach(view.querySelector("#gw"));
   }
 
-  attachColumnFilters(view.querySelector("thead tr.hdr-row"), INVOICE_DUMP_COLS, vstate,
-    function onSort(key, dir) { vstate.sort = { col: key, dir: dir }; renderInvoiceDump(); },
+  attachColumnFilters(view.querySelector("thead tr.hdr-row"), vstate,
+    function onSort(key, dir) {
+      var prev = vstate.sort;
+      var next = { col: key, dir: dir };
+      HISTORY.perform({
+        label: "sort by " + key,
+        apply: function () { vstate.sort = next; },
+        revert: function () { vstate.sort = prev; }
+      });
+      render();
+    },
     function onFilterApply(key, set) {
-      if (set) vstate.filters[key] = set; else delete vstate.filters[key];
-      renderInvoiceDump();
+      var prev = vstate.filters[key];
+      HISTORY.perform({
+        label: "filter " + key,
+        apply: function () { if (set) vstate.filters[key] = set; else delete vstate.filters[key]; },
+        revert: function () { if (prev) vstate.filters[key] = prev; else delete vstate.filters[key]; }
+      });
+      render();
     },
     function uniqueValuesFn(key) {
       var seen = {}, out = [];
@@ -155,7 +171,15 @@ export function renderInvoiceDump() {
     });
   }
   var clr = view.querySelector("#idClrFilters");
-  if (clr) clr.addEventListener("click", function () { vstate.filters = {}; renderInvoiceDump(); });
+  if (clr) clr.addEventListener("click", function () {
+    var prev = vstate.filters;
+    HISTORY.perform({
+      label: "clear filters",
+      apply: function () { vstate.filters = {}; },
+      revert: function () { vstate.filters = prev; }
+    });
+    render();
+  });
 
   var exportBtn = view.querySelector("#idExport");
   if (exportBtn) exportBtn.addEventListener("click", function () {
