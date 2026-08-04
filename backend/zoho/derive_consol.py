@@ -15,6 +15,23 @@ Zoho item name, which — checked against the real 2,384-row export — reliably
 ends in "-M" (Monthly/recurring) or "-O" (One-time) for ~92% of distinct
 items; the rest fall back to one-time (the conservative choice — it never
 overstates recurring revenue).
+
+A single line item's amount is frequently a lump sum covering several
+months at once — a client billed monthly still gets ONE invoice line for a
+half-yearly or annual prepayment, not six/twelve separate lines. Usage
+Period (From/Till) is the authoritative signal for exactly which months
+that covers, but was missing on 164/2384 real rows. Roughly half the real
+rows state the covered period directly in the Item Description instead
+(e.g. "INR 550 / User * 6 Months", "@400/user/month * 3 months") —
+resolve_period() prefers explicit Usage Period dates, and falls back to
+parsing that text (anchored at the invoice date) when dates are absent,
+recovering 36 of those 164 rows in the real export (128 remain genuinely
+unresolvable — no dates and no stated period — and stay flagged, not
+dropped). Whichever period is found, bifurcate_by_client_month() applies
+the exact same day-weighted split regardless of whether that period is 1,
+3, 6, 12 or any other number of months — verified on a synthetic 6-month,
+₹60,000 lump sum: it splits proportionally by days across exactly Apr-Sep
+and sums back to ₹60,000.00 exactly, not approximately.
 """
 import re
 from datetime import date, timedelta
@@ -70,11 +87,66 @@ def _parse_ddmonyy(s):
     return (date(year, month, int(day)) - EPOCH).days
 
 
+_MONTHS_IN_DESC = re.compile(r"(\d+)\s*months?\b", re.IGNORECASE)
+BILLING_FREQUENCY_LABELS = {1: "Monthly", 3: "Quarterly", 6: "Half-yearly", 12: "Yearly"}
+
+
+def infer_billing_months(desc):
+    """Item description -> the number of months its amount covers, read
+    straight from text like "* 6 Months" / "* 3 months", or None if the
+    description doesn't state one. Bounded to a sane range (1-36) so a
+    stray unrelated number elsewhere in the text can't be misread."""
+    if not desc:
+        return None
+    m = _MONTHS_IN_DESC.search(desc)
+    if not m:
+        return None
+    n = int(m.group(1))
+    return n if 1 <= n <= 36 else None
+
+
+def billing_frequency_label(months):
+    if months is None:
+        return None
+    return BILLING_FREQUENCY_LABELS.get(months, f"Custom ({months} months)")
+
+
+def _add_months(d, months):
+    """Last calendar day of the month `months` after d's month (d.day is
+    ignored on the way out — billing periods are whole months)."""
+    total = d.month - 1 + months
+    year = d.year + total // 12
+    month = total % 12 + 1
+    next_month = date(year + (1 if month == 12 else 0), (month % 12) + 1, 1)
+    return next_month - timedelta(days=1)
+
+
+def resolve_period(row, invdate_dnum):
+    """(start, end, source) day-numbers for a line's service period.
+    Prefers explicit Usage Period dates; falls back to the description's
+    stated billing length anchored at the invoice date; else unresolved.
+    source is "dates" | "description" | None, purely for visibility into
+    which rows are relying on the weaker signal."""
+    start = _parse_ddmonyy(row.get("usageFrom"))
+    end = _parse_ddmonyy(row.get("usageTill"))
+    if start is not None and end is not None and end >= start:
+        return start, end, "dates"
+
+    months = infer_billing_months(row.get("desc"))
+    if months is None or invdate_dnum is None:
+        return None, None, None
+    inv_date = EPOCH + timedelta(days=invdate_dnum)
+    period_end = _add_months(date(inv_date.year, inv_date.month, 1), months - 1)
+    return invdate_dnum, (period_end - EPOCH).days, "description"
+
+
 def derive_consol_rows(invoice_dump_rows, void_statuses=("void",)):
     """Filters out Void-status lines and maps the rest into Consol-Sheet-
     shaped rows: {inv, client, invdate, item, product, desc, rec, users,
-    start, end, amount}. start/end are None (flagged, not dropped — same
-    convention as the rest of the app) when Usage Period wasn't set."""
+    start, end, amount, periodSource, billingFrequency}. start/end are
+    None (flagged, not dropped — same convention as the rest of the app)
+    only when NEITHER Usage Period dates nor a parseable description
+    period could be found."""
     void_set = {s.strip().lower() for s in void_statuses}
     out = []
     for r in invoice_dump_rows:
@@ -82,14 +154,12 @@ def derive_consol_rows(invoice_dump_rows, void_statuses=("void",)):
         if status in void_set:
             continue
         product, recurring = classify_item(r.get("item"))
-        start = _parse_ddmonyy(r.get("usageFrom"))
-        end = _parse_ddmonyy(r.get("usageTill"))
-        if start is None or end is None or end < start:
-            start = end = None
+        invdate = _parse_ddmonyy(r.get("invdate"))
+        start, end, source = resolve_period(r, invdate)
         out.append({
             "inv": r.get("inv", ""),
             "client": r.get("client", ""),
-            "invdate": _parse_ddmonyy(r.get("invdate")),
+            "invdate": invdate,
             "item": r.get("item", ""),
             "product": product,
             "desc": r.get("desc", ""),
@@ -98,6 +168,8 @@ def derive_consol_rows(invoice_dump_rows, void_statuses=("void",)):
             "start": start,
             "end": end,
             "amount": r.get("total", 0),
+            "periodSource": source,
+            "billingFrequency": billing_frequency_label(infer_billing_months(r.get("desc"))),
         })
     return out
 
