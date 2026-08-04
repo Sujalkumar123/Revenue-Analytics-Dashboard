@@ -10,11 +10,20 @@ This module exists to be tested and ready for that future sync, not to run
 today.
 
 Two things Invoice Dump's raw columns don't carry that Consol Sheet needs:
-Product and Recurring-vs-One-time. classify_item() infers both from the
-Zoho item name, which — checked against the real 2,384-row export — reliably
-ends in "-M" (Monthly/recurring) or "-O" (One-time) for ~92% of distinct
-items; the rest fall back to one-time (the conservative choice — it never
-overstates recurring revenue).
+Product and Recurring-vs-One-time. classify_item() looks Product up in
+item_product_map.json first — a real, verified item-name -> product table
+(70 entries, majority-vote resolved from ~2,500 real ground-truth rows the
+repo owner supplied directly from actual classified data; only 6 items had
+any disagreement at all, and blank entries are genuine — some items, like
+most "-O"/setup charges, carry no product in the real data either). Only
+an item name that isn't in that table at all falls back to the old
+prefix/suffix guess (SFA GT/DMS/SFA MT/FLO prefix -> that product, else
+"Other modules") — which the ground truth confirms was wrong in several
+real cases (e.g. "DMS - Support Charges-M" and "SFA GT - Analytics
+Subscription Charges-M" are both "Other modules", not their prefix's
+product), so the table always wins when an exact name match exists.
+Recurring-vs-One-time still comes from the "-M"/"-O" suffix, which the
+ground truth doesn't cover but is reliable on its own.
 
 A single line item's amount is frequently a lump sum covering several
 months at once — a client billed monthly still gets ONE invoice line for a
@@ -33,17 +42,28 @@ the exact same day-weighted split regardless of whether that period is 1,
 ₹60,000 lump sum: it splits proportionally by days across exactly Apr-Sep
 and sums back to ₹60,000.00 exactly, not approximately.
 """
+import json
 import re
 from datetime import date, timedelta
+from pathlib import Path
 
 EPOCH = date(2022, 1, 1)
 MN = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
 
-# Zoho item-name prefix (text before the first " - ") -> the app's existing
-# canonical product-tab names (frontend/js/controller.js TABS). Confirmed
-# against the real export: SFA GT/DMS/SFA MT/FLO each map 1:1 to one tab;
-# every other prefix (Analytics Studio, Power BI, Route Optimisation, "SFA +
-# DMS" bundles, etc.) falls under the app's existing "Other modules" tab.
+# Real, verified item-name -> product table — see module docstring. Loaded
+# once at import time; item_product_map.json is the source of truth and can
+# be regenerated/edited directly (or via the frontend's mapping UI, once
+# that's synced server-side).
+_MAP_PATH = Path(__file__).resolve().parent / "item_product_map.json"
+try:
+    ITEM_PRODUCT_MAP = json.loads(_MAP_PATH.read_text(encoding="utf-8"))
+except FileNotFoundError:
+    ITEM_PRODUCT_MAP = {}
+
+# Fallback ONLY for item names not present in ITEM_PRODUCT_MAP at all (e.g.
+# a genuinely new item Zoho hasn't seen before). Zoho item-name prefix (text
+# before the first " - ") -> the app's existing canonical product-tab names
+# (frontend/js/controller.js TABS).
 PRODUCT_PREFIX_MAP = {
     "SFA GT": "GT subscription",
     "DMS": "DMS subscription",
@@ -56,11 +76,20 @@ _RECURRING_SUFFIX = re.compile(r"-\s*M\s*$", re.IGNORECASE)
 _ONETIME_SUFFIX = re.compile(r"-\s*O\s*$", re.IGNORECASE)
 
 
-def classify_item(item_name):
-    """item name -> (product, recurring: bool)"""
-    item_name = (item_name or "").strip()
+def _guess_product(item_name):
     prefix = item_name.split(" - ")[0].strip() if " - " in item_name else item_name
-    product = PRODUCT_PREFIX_MAP.get(prefix, DEFAULT_PRODUCT)
+    return PRODUCT_PREFIX_MAP.get(prefix, DEFAULT_PRODUCT)
+
+
+def classify_item(item_name):
+    """item name -> (product, recurring: bool). product may be "" — that's
+    a real, verified answer (several item types genuinely carry no product
+    in the ground-truth data), not a missing value."""
+    item_name = (item_name or "").strip()
+    if item_name in ITEM_PRODUCT_MAP:
+        product = ITEM_PRODUCT_MAP[item_name]
+    else:
+        product = _guess_product(item_name)
     if _RECURRING_SUFFIX.search(item_name):
         recurring = True
     elif _ONETIME_SUFFIX.search(item_name):

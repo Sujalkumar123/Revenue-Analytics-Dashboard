@@ -49,6 +49,7 @@ export function renderCreditNoteDump() {
     searchFields: ["cn", "client", "item", "gstin", "assocInv", "ref"],
     searchPlaceholder: "Search credit note no, client, item, GSTIN, associated invoice…",
     badge: "Read-only — raw export from Zoho Books",
+    hasItemCol: true,
     totalField: "itemTotal",
     totalLabel: "Item total (view)",
     totalColLabel: "Item Total",

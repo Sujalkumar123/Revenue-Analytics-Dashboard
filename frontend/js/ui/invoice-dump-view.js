@@ -39,6 +39,7 @@ export function renderInvoiceDump() {
     searchFields: ["inv", "client", "item", "gstin", "po", "so"],
     searchPlaceholder: "Search invoice no, client, item, GSTIN, PO, SO…",
     badge: "Read-only — raw export from Zoho Books",
+    hasItemCol: true,
     totalField: "total",
     totalLabel: "Item total (view)",
     totalColLabel: "Item Total",
