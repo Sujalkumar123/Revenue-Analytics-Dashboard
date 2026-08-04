@@ -11,16 +11,12 @@ export var readyFlag = { value: false };
 export var state = { tab: "recurr", fy: "2024-25", metric: "net", search: "", sort: "total_desc", flagOnly: false };
 
 export var TABS = [
-  { id: "recurr",  label: "Recurring Revenue by Client" },
-  { id: "consol",  label: "Consol Sheet" },
-  { id: "invoice", label: "Invoice Dump" },
-  { id: "credit",  label: "Credit Notes" },
-  { id: "sfagt",   label: "SFA GT",        product: "GT subscription" },
-  { id: "dms",     label: "DMS",           product: "DMS subscription" },
-  { id: "sfamt",   label: "SFA MT",        product: "MT subscription" },
-  { id: "flo",     label: "Flo",           product: "Flo subscription" },
-  { id: "other",   label: "Other Modules", product: "Other modules" },
-  { id: "onetime", label: "One-time (OTC)" }
+  { id: "recurr",        label: "Recurring Revenue" },
+  { id: "consol",        label: "Invoice working" },
+  { id: "invoice",       label: "Invoice Dump" },
+  { id: "creditworking", label: "Credit Note Working" },
+  { id: "credit",        label: "Credit Note" },
+  { id: "onetime",       label: "One time" }
 ];
 
 export function curFY() { return FYS.filter(function (f) { return f.id === state.fy; })[0] || FYS[2]; }

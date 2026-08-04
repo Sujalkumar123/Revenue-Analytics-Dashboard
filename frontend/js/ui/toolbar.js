@@ -68,3 +68,7 @@ export var LEDGER_COLS = [
   { label: "End Date", f: "end", edit: true, w: 112 },
   { label: "Amount", f: "amount", num: true, edit: true, w: 125 }
 ];
+export var CREDIT_COLS = LEDGER_COLS.map(function (c) {
+  return c.f === "inv" ? { label: "Credit Note No.", f: "inv", w: 158 }
+    : c.f === "invdate" ? { label: "Credit Note Date", f: "invdate", w: 118 } : c;
+});
