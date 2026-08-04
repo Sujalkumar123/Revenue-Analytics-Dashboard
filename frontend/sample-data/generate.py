@@ -77,11 +77,38 @@ def build_ledger(is_credit):
     }
 
 
+def build_invoice_dump():
+    cols = ["invdate", "inv", "status", "client", "currency", "fx", "item", "desc", "qty",
+            "price", "total", "taxable", "usageFrom", "usageTill", "gstin", "po", "so",
+            "discount", "branch", "cgst", "sgst", "igst"]
+    statuses = ["Closed", "Open", "Overdue", "PartiallyPaid"]
+    rows = []
+    n = 0
+    for client in CLIENTS:
+        for i in range(random.randint(2, 6)):
+            n += 1
+            product = random.choice(PRODUCTS)
+            total = round(random.uniform(15000, 90000), 2)
+            rows.append({
+                "invdate": "01-Apr-26", "inv": f"F2K/2026-27/{n:04d}", "status": random.choice(statuses),
+                "client": client, "currency": "INR", "fx": 1.0, "item": ITEMS[product],
+                "desc": "@ INR 500 / User * 1 Month", "qty": random.randint(5, 40), "price": round(total * 0.9, 2),
+                "total": total, "taxable": total, "usageFrom": "", "usageTill": "",
+                "gstin": "27AASAMPLE1Z" + str(n % 10), "po": "", "so": "",
+                "discount": 0.0, "branch": "Head Office",
+                "cgst": 0.0, "sgst": 0.0, "igst": round(total * 0.18, 2),
+            })
+    return {"cols": cols, "labels": {c: c for c in cols}, "rows": rows}
+
+
 consol = build_ledger(is_credit=False)
 credit = build_ledger(is_credit=True)
 dims = {c: {"product": "SFA", "category": "Demo", "region": "Domestic", "geo": "Sample"} for c in CLIENTS}
+invoice_dump = build_invoice_dump()
 
 (OUT / "consol.json").write_text(json.dumps(consol), encoding="utf-8")
 (OUT / "creditnotes.json").write_text(json.dumps(credit), encoding="utf-8")
 (OUT / "clientdims.json").write_text(json.dumps(dims), encoding="utf-8")
-print(f"wrote {len(consol['rows'])} consol rows, {len(credit['rows'])} credit rows for {len(CLIENTS)} fictional clients")
+(OUT / "invoicedump.json").write_text(json.dumps(invoice_dump), encoding="utf-8")
+print(f"wrote {len(consol['rows'])} consol rows, {len(credit['rows'])} credit rows, "
+      f"{len(invoice_dump['rows'])} invoice-dump rows for {len(CLIENTS)} fictional clients")

@@ -4,11 +4,11 @@
    Recurring Revenue sheet is the analytic layer and is editable. */
 "use strict";
 
-import { fyMonths } from "./core/dates.js";
-import { state, TABS, S, curFY, readyFlag } from "./state/app-state.js";
+import { state, TABS, S, readyFlag } from "./state/app-state.js";
 import { onlyRecurring, onlyOneTime, recurringProduct } from "./data/revenue.js";
 import { renderMatrix } from "./ui/matrix-view.js";
 import { renderLedger } from "./ui/ledger-view.js";
+import { renderInvoiceDump } from "./ui/invoice-dump-view.js";
 import { LEDGER_COLS, CREDIT_COLS } from "./ui/toolbar.js";
 import { SEL } from "./ui/selection.js";
 
@@ -31,16 +31,7 @@ export function render(keepFocus) {
       title: "Consol Sheet", source: "Zoho Books", kpiSub: "invoice lines"
     });
   } else if (state.tab === "invoice") {
-    renderLedger({
-      ds: S.consol, sheet: "consol", cols: LEDGER_COLS, readOnly: true,
-      title: "Invoice Dump", source: "Zoho Books", kpiSub: "invoices raised this FY",
-      filter: (function () {
-        var ms = fyMonths(curFY());
-        if (!ms.length) return null;
-        var lo = ms[0].s, hi = ms[ms.length - 1].e;
-        return function (ds, sheet, i) { var d = ds.rows[i][2]; return d !== null && d >= lo && d <= hi; };
-      })()
-    });
+    renderInvoiceDump();
   } else if (state.tab === "credit") {
     renderLedger({
       ds: S.credit, sheet: "credit", cols: CREDIT_COLS, readOnly: true,

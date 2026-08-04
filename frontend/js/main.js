@@ -135,10 +135,10 @@ function boot() {
   startApp();
 }
 
-/* data/ (the real ledger) is gitignored — it never ships to a public
-   deployment. sample-data/ is a small fictional dataset that IS committed,
-   so a fresh checkout or a public deployment (e.g. Vercel) still shows a
-   working dashboard instead of a blank error screen. */
+/* data/ is the real ledger; sample-data/ is a small fictional fallback
+   dataset that's always present, so a checkout missing data/ (or one where
+   it's since been removed) still shows a working dashboard instead of a
+   blank error screen. */
 function fetchJSON(base, name) {
   return fetch(base + "/" + name).then(function (r) {
     if (!r.ok) throw new Error(name + " " + r.status);
@@ -149,7 +149,8 @@ function loadFrom(base) {
   return Promise.all([
     fetchJSON(base, "consol.json"),
     fetchJSON(base, "creditnotes.json"),
-    fetchJSON(base, "clientdims.json").catch(function () { return {}; })
+    fetchJSON(base, "clientdims.json").catch(function () { return {}; }),
+    fetchJSON(base, "invoicedump.json").catch(function () { return { cols: [], rows: [] }; })
   ]);
 }
 
@@ -160,7 +161,7 @@ function loadData() {
       return loadFrom("sample-data");
     })
     .then(function (res) {
-      S.consol = res[0]; S.credit = res[1]; S.dims = res[2];
+      S.consol = res[0]; S.credit = res[1]; S.dims = res[2]; S.invoiceDump = res[3];
       applyAdds("consol", S.consol);
       applyAdds("credit", S.credit);
       readyFlag.value = true;

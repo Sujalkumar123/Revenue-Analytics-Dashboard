@@ -197,6 +197,30 @@ table.grid thead tr.hdr-row th{
   border-bottom:1px solid var(--border);cursor:pointer;
 }
 table.grid thead tr.hdr-row th:hover{color:var(--accent)}
+
+/* Excel-style per-column filter: small funnel button in each header cell */
+.colf-hd{display:flex;align-items:center;justify-content:space-between;gap:4px;width:100%}
+.colf-lbl{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.colf-btn{flex:none;background:none;border:none;color:var(--ink-3);cursor:pointer;font-size:9px;
+  padding:2px 3px;border-radius:4px;line-height:1;font-family:inherit}
+.colf-btn:hover{color:var(--accent);background:var(--accent-soft)}
+.colf-btn.active{color:var(--accent);background:var(--accent-soft)}
+.colf-pop{
+  position:fixed;z-index:95;width:230px;max-height:340px;display:flex;flex-direction:column;
+  background:var(--panel);border:1px solid var(--border-strong);border-radius:11px;
+  box-shadow:var(--shadow-lg);padding:6px;font-size:12.5px;text-transform:none;letter-spacing:normal;
+  font-weight:400;color:var(--ink);text-align:left;
+}
+.colf-item{display:flex;align-items:center;gap:7px;width:100%;text-align:left;background:none;
+  border:none;color:var(--ink);padding:6px 7px;font-size:12px;font-family:inherit;cursor:pointer;
+  border-radius:7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.colf-item:hover{background:var(--surface-2)}
+.colf-item input[type=checkbox]{flex:none}
+.colf-div{height:1px;background:var(--border-soft);margin:4px 2px}
+.colf-search{margin:4px 2px;width:calc(100% - 4px)}
+.colf-all{font-weight:650;border-bottom:1px solid var(--border-soft);border-radius:0;margin-bottom:2px}
+.colf-list{overflow-y:auto;flex:1;min-height:40px}
+.colf-ft{display:flex;justify-content:flex-end;gap:7px;padding:7px 4px 2px;border-top:1px solid var(--border-soft);margin-top:4px}
 table.grid thead tr.total-row th{
   position:sticky;top:34px;z-index:5;color:var(--ink);font-weight:750;text-align:right;
   background:var(--surface-2);border-bottom:2px solid var(--accent);
