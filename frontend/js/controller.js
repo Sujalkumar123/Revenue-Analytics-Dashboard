@@ -9,7 +9,8 @@ import { onlyRecurring, onlyOneTime, recurringProduct } from "./data/revenue.js"
 import { renderMatrix } from "./ui/matrix-view.js";
 import { renderLedger } from "./ui/ledger-view.js";
 import { renderInvoiceDump } from "./ui/invoice-dump-view.js";
-import { LEDGER_COLS, CREDIT_COLS } from "./ui/toolbar.js";
+import { renderCreditNoteDump } from "./ui/credit-note-dump-view.js";
+import { LEDGER_COLS } from "./ui/toolbar.js";
 import { SEL } from "./ui/selection.js";
 
 export function render(keepFocus) {
@@ -33,10 +34,7 @@ export function render(keepFocus) {
   } else if (state.tab === "invoice") {
     renderInvoiceDump();
   } else if (state.tab === "credit") {
-    renderLedger({
-      ds: S.credit, sheet: "credit", cols: CREDIT_COLS, readOnly: true,
-      title: "Credit Notes Register", source: "Zoho Books", kpiSub: "credit-note lines"
-    });
+    renderCreditNoteDump();
   }
 
   if (focusId === "q") {

@@ -77,6 +77,18 @@ def build_ledger(is_credit):
     }
 
 
+MN_ABBR = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+
+
+def fy2425_date():
+    # spread across FY 2024-25 (Apr-24..Mar-25) — the app's default selected
+    # FY, so sample rows are visible without switching the FY dropdown
+    month = random.choice(list(range(4, 13)) + [1, 2, 3])
+    year = 2024 if month >= 4 else 2025
+    day = random.randint(1, 28)
+    return f"{day:02d}-{MN_ABBR[month - 1]}-{str(year)[2:]}"
+
+
 def build_invoice_dump():
     cols = ["invdate", "inv", "status", "client", "currency", "fx", "item", "desc", "qty",
             "price", "total", "taxable", "usageFrom", "usageTill", "gstin", "po", "so",
@@ -90,7 +102,7 @@ def build_invoice_dump():
             product = random.choice(PRODUCTS)
             total = round(random.uniform(15000, 90000), 2)
             rows.append({
-                "invdate": "01-Apr-26", "inv": f"F2K/2026-27/{n:04d}", "status": random.choice(statuses),
+                "invdate": fy2425_date(), "inv": f"F2K/2024-25/{n:04d}", "status": random.choice(statuses),
                 "client": client, "currency": "INR", "fx": 1.0, "item": ITEMS[product],
                 "desc": "@ INR 500 / User * 1 Month", "qty": random.randint(5, 40), "price": round(total * 0.9, 2),
                 "total": total, "taxable": total, "usageFrom": "", "usageTill": "",
@@ -101,14 +113,44 @@ def build_invoice_dump():
     return {"cols": cols, "labels": {c: c for c in cols}, "rows": rows}
 
 
+def build_credit_note_dump():
+    cols = ["cndate", "cn", "status", "client", "total", "einvoice", "assocInv", "assocInvDate",
+            "currency", "fx", "item", "desc", "qty", "price", "itemTotal", "taxable", "usageFrom",
+            "usageTill", "supplierGstin", "taxPct", "hsn", "cgst", "sgst", "igst", "branch",
+            "gstTreatment", "gstin", "discount", "ref"]
+    rows = []
+    n = 0
+    for client in CLIENTS:
+        if random.random() < 0.4:
+            continue  # not every fictional client has a credit note
+        n += 1
+        product = random.choice(PRODUCTS)
+        total = round(random.uniform(2000, 20000), 2)
+        rows.append({
+            "cndate": fy2425_date(), "cn": f"F2K/2425/CN/{n:04d}", "status": random.choice(["Open", "Closed"]),
+            "client": client, "total": total, "einvoice": "Pushed",
+            "assocInv": f"F2K/2024-25/{n:04d}", "assocInvDate": fy2425_date(),
+            "currency": "INR", "fx": 1.0, "item": ITEMS[product], "desc": "Adjustment credit",
+            "qty": 1.0, "price": total, "itemTotal": total, "taxable": total,
+            "usageFrom": "", "usageTill": "", "supplierGstin": "06AASAMPLE1ZL",
+            "taxPct": 18.0, "hsn": "998313", "cgst": 0.0, "sgst": 0.0, "igst": round(total * 0.18, 2),
+            "branch": "Head Office", "gstTreatment": "business_gst",
+            "gstin": "27AASAMPLE1Z" + str(n % 10), "discount": 0.0, "ref": "",
+        })
+    return {"cols": cols, "labels": {c: c for c in cols}, "rows": rows}
+
+
 consol = build_ledger(is_credit=False)
 credit = build_ledger(is_credit=True)
 dims = {c: {"product": "SFA", "category": "Demo", "region": "Domestic", "geo": "Sample"} for c in CLIENTS}
 invoice_dump = build_invoice_dump()
+credit_note_dump = build_credit_note_dump()
 
 (OUT / "consol.json").write_text(json.dumps(consol), encoding="utf-8")
 (OUT / "creditnotes.json").write_text(json.dumps(credit), encoding="utf-8")
 (OUT / "clientdims.json").write_text(json.dumps(dims), encoding="utf-8")
 (OUT / "invoicedump.json").write_text(json.dumps(invoice_dump), encoding="utf-8")
+(OUT / "creditnotedump.json").write_text(json.dumps(credit_note_dump), encoding="utf-8")
 print(f"wrote {len(consol['rows'])} consol rows, {len(credit['rows'])} credit rows, "
-      f"{len(invoice_dump['rows'])} invoice-dump rows for {len(CLIENTS)} fictional clients")
+      f"{len(invoice_dump['rows'])} invoice-dump rows, {len(credit_note_dump['rows'])} credit-note-dump rows "
+      f"for {len(CLIENTS)} fictional clients")

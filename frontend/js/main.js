@@ -150,7 +150,8 @@ function loadFrom(base) {
     fetchJSON(base, "consol.json"),
     fetchJSON(base, "creditnotes.json"),
     fetchJSON(base, "clientdims.json").catch(function () { return {}; }),
-    fetchJSON(base, "invoicedump.json").catch(function () { return { cols: [], rows: [] }; })
+    fetchJSON(base, "invoicedump.json").catch(function () { return { cols: [], rows: [] }; }),
+    fetchJSON(base, "creditnotedump.json").catch(function () { return { cols: [], rows: [] }; })
   ]);
 }
 
@@ -161,7 +162,7 @@ function loadData() {
       return loadFrom("sample-data");
     })
     .then(function (res) {
-      S.consol = res[0]; S.credit = res[1]; S.dims = res[2]; S.invoiceDump = res[3];
+      S.consol = res[0]; S.credit = res[1]; S.dims = res[2]; S.invoiceDump = res[3]; S.creditNoteDump = res[4];
       applyAdds("consol", S.consol);
       applyAdds("credit", S.credit);
       readyFlag.value = true;
