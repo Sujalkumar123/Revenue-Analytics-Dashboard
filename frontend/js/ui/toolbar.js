@@ -15,6 +15,7 @@ export function kpiCard(k, v, s, cls) {
 
 export function toolbarControlsHTML(opts) {
   var noAdd = opts && opts.noAdd;
+  var noExport = opts && opts.noExport;
   return '<span class="tb-right">' +
     /* Undo/redo isn't admin-only — filtering/sorting (also on the shared
        HISTORY stack) is something every role can do and undo. Only adding
@@ -34,7 +35,9 @@ export function toolbarControlsHTML(opts) {
       return '<option value="' + f.id + '"' + (f.id === state.fy ? " selected" : "") + ">" + f.label + "</option>";
     }).join("") +
     "</select>" +
-    '<button class="icon-btn" id="exportBtn" title="Download this view as CSV">↓ CSV</button>' +
+    /* Some views (the line-item ledgers) move CSV export down to the
+       load-more bar instead, to keep this row from getting crowded. */
+    (noExport ? "" : '<button class="icon-btn" id="exportBtn" title="Download this view as CSV">↓ CSV</button>') +
     "</span>";
 }
 

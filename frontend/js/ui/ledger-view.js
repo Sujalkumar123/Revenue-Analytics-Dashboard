@@ -87,16 +87,14 @@ export function renderLedger(opts) {
     '<input type="search" id="q" placeholder="Search invoice no, client, item…" value="' + esc(state.search) + '" />' +
     (opts.readOnly
       ? '<span class="badge-lock">🔒 Read-only — sourced from ' + esc(opts.source) + "</span>"
-      : (canEdit() ? '<span class="prov"><span class="dot usr"></span><b>A</b> = admin-edited</span>'
-                   : '<span class="badge-lock">🔒 Read-only access</span>')) +
+      : (canEdit() ? "" : '<span class="badge-lock">🔒 Read-only access</span>')) +
     (added ? '<span class="prov"><span class="dot new"></span>Added (' + added + ")</span>" : "") +
-    '<span class="chip"><b>' + idx.length.toLocaleString("en-IN") + "</b> rows</span>" +
-    (flagged ? '<button class="icon-btn" id="onlyFlag" style="border-color:var(--gold);color:var(--gold)">' +
-      (state.flagOnly ? "✓ " : "") + "Needs attention (" + flagged + ")</button>" : "") +
+    (flagged ? '<button class="chip-warn" id="onlyFlag" aria-pressed="' + state.flagOnly + '">⚠ ' +
+      (state.flagOnly ? "Showing needs attention (" : "Needs attention (") + flagged + ")</button>" : "") +
     (edits && !locked ? '<button class="icon-btn" id="clrEdits">Reset ' + edits + " edit(s)</button>" : "") +
     (activeFilterKeys.length ? '<button class="icon-btn" id="clrFilters">Clear ' + activeFilterKeys.length + " filter(s)</button>" : "") +
-    (!locked ? '<button class="icon-btn" id="itemMapBtn">🔤 Item → Product mapping</button>' : "") +
-    toolbarControlsHTML() + "</div>";
+    (!locked ? '<button class="chip-tool" id="itemMapBtn">🔤 Item → Product mapping</button>' : "") +
+    toolbarControlsHTML({ noExport: true }) + "</div>";
 
   var cols = locked
     ? opts.cols.map(function (c) { var d = {}; for (var k in c) d[k] = c[k]; d.edit = false; return d; })
@@ -148,7 +146,7 @@ export function renderLedger(opts) {
     html += '<tr><td colspan="' + (cols.length + months.length + 2) + '" style="padding:26px;text-align:center;color:var(--ink-3)">No matching rows.</td></tr>';
   }
   html += '</tbody></table><div class="sentinel" aria-hidden="true"></div></div>' +
-    (idx.length ? loadMoreHTML(idx.length) : "") + "</div>";
+    (idx.length ? loadMoreHTML(idx.length, true) : "") + "</div>";
 
   var view = document.getElementById("view");
   view.innerHTML = html;

@@ -186,6 +186,24 @@ select:focus,input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--a
 .badge-lock{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:650;
   color:var(--ink-2);background:var(--lock);border:1px solid var(--border);padding:4px 10px;border-radius:99px}
 
+/* Warning-toned pill, clickable — filters the grid down to just the flagged
+   rows when pressed. Semantic gold, not the accent hue, so it reads as
+   "needs attention" rather than "the tool you'd reach for next". */
+.chip-warn{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:650;
+  color:var(--gold);background:var(--gold-soft);border:1px solid transparent;
+  padding:6px 12px;border-radius:99px;cursor:pointer;font-family:inherit;
+  transition:background .13s,border-color .13s,color .13s}
+.chip-warn:hover{border-color:var(--gold)}
+.chip-warn[aria-pressed="true"]{background:var(--gold);color:var(--panel);border-color:transparent}
+
+/* Accent-toned pill for the item->product mapping tool — a utility action,
+   set apart from the plain icon-btn cluster next to it. */
+.chip-tool{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:650;
+  color:var(--accent);background:var(--accent-soft);border:1px solid transparent;
+  padding:6px 12px;border-radius:99px;cursor:pointer;font-family:inherit;
+  transition:background .13s,border-color .13s,color .13s}
+.chip-tool:hover{border-color:var(--accent)}
+
 /* ═════════ grid ═════════ */
 .grid-wrap{overflow:auto;position:relative;flex:1;min-height:0;contain:paint;will-change:scroll-position}
 table.grid{border-collapse:separate;border-spacing:0;font-size:12.5px;table-layout:fixed;width:max-content}
@@ -312,10 +330,12 @@ td.sticky-l{cursor:pointer}
 .statusbar .clear:hover{color:var(--bad)}
 @media(max-width:720px){ .statusbar{right:8px;bottom:8px} .statusbar .stat{min-width:74px;padding:6px 10px} }
 
-.load-more{display:flex;align-items:center;justify-content:center;gap:10px;padding:9px;
+.load-more{display:flex;align-items:center;padding:9px 14px;
   font-size:11.5px;color:var(--ink-3);border-top:1px solid var(--border);background:var(--surface-2)}
+.load-more .lm-center{flex:1;display:flex;align-items:center;justify-content:center;gap:10px}
 .load-more .bar{flex:0 0 170px;height:4px;border-radius:99px;background:var(--surface-3);overflow:hidden}
 .load-more .bar i{display:block;height:100%;border-radius:99px;background:var(--accent);transition:width .25s ease}
+.load-more .lm-csv{margin-left:auto;flex:none}
 
 /* ═════════ modal ═════════ */
 .modal-backdrop{position:fixed;inset:0;z-index:80;background:rgba(20,28,40,.55);

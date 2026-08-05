@@ -5,10 +5,12 @@
    large tables. */
 "use strict";
 
-export function loadMoreHTML(total) {
+export function loadMoreHTML(total, showExport) {
   return '<div class="load-more" id="loadMore">' +
-    '<span class="bar"><i style="width:0%"></i></span>' +
-    '<span id="loadTxt">0 of ' + total.toLocaleString("en-IN") + " rows</span></div>";
+    '<span class="lm-center"><span class="bar"><i style="width:0%"></i></span>' +
+    '<span id="loadTxt">0 of ' + total.toLocaleString("en-IN") + " rows</span></span>" +
+    (showExport ? '<button class="icon-btn lm-csv" id="exportBtn" title="Download this view as CSV">↓ CSV</button>' : "") +
+    "</div>";
 }
 
 export function attachInfinite(wrap, tbody, total, chunkHTML) {
