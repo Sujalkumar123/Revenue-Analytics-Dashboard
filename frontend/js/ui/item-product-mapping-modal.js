@@ -8,6 +8,7 @@
 import { esc } from "../core/format.js";
 import { getProduct, setProduct, clearOverride } from "../state/item-product-map.js";
 import { toast } from "./toast.js";
+import { render } from "../core/bus.js";
 
 var KNOWN_PRODUCTS = ["GT subscription", "DMS subscription", "MT subscription", "Flo subscription", "Other modules"];
 
@@ -86,7 +87,10 @@ export function openItemProductMappingModal(itemNames) {
       setProduct(item, typed);
       changed++;
     });
-    if (changed) toast("Saved " + changed + " item→product mapping" + (changed === 1 ? "" : "s") + ".");
+    if (changed) {
+      toast("Saved " + changed + " item→product mapping" + (changed === 1 ? "" : "s") + ".");
+      render();   // Product column reflects the new mapping immediately, not just on next tab switch
+    }
     close();
   });
 }

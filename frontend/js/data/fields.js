@@ -5,6 +5,18 @@
 
 import { fmtDate, parseUserDate } from "../core/dates.js";
 import { getEdit } from "../state/stores.js";
+import { getProduct } from "../state/item-product-map.js";
+
+/* Item -> Product map takes precedence over the value baked into the
+   dataset at build time — that's the whole point of the mapping tool: an
+   admin assigns a product for an item once, and it applies to every row
+   carrying that item name from then on, without needing new data to be
+   rebuilt. A per-row inline edit on the Product cell itself still wins
+   over both, same as every other editable field here. */
+function mappedProduct(ds, r) {
+  var mapped = getProduct(ds.dicts.item[r[3]]);
+  return mapped !== null ? mapped : ds.dicts.product[r[4]];
+}
 
 export function fieldVal(ds, sheet, ri, field) {
   var e = getEdit(sheet, ri, field);
@@ -15,7 +27,7 @@ export function fieldVal(ds, sheet, ri, field) {
     case "client": return d.client[r[1]];
     case "invdate": return fmtDate(r[2]);
     case "item": return d.item[r[3]];
-    case "product": return d.product[r[4]];
+    case "product": return mappedProduct(ds, r);
     case "desc": return d.desc[r[5]];
     case "rec": return r[6] ? "Recurring" : "One-time";
     case "users": return r[7];
@@ -41,7 +53,7 @@ export function effRec(ds, sheet, ri) {
 }
 export function effProduct(ds, sheet, ri) {
   var e = getEdit(sheet, ri, "product");
-  return e !== undefined ? e : ds.dicts.product[ds.rows[ri][4]];
+  return e !== undefined ? e : mappedProduct(ds, ds.rows[ri]);
 }
 /* service period, honouring edited dates — so filling a blank date on a
    flagged row immediately brings its revenue into every total */

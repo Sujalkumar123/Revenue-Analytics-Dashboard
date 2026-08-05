@@ -27,7 +27,7 @@ function getVstate(key) { return vstateByKey[key] || (vstateByKey[key] = { filte
  *   getRows        () -> row objects (plain {colKey: value})
  *   dateKey        column key used to scope rows to the selected FY
  *   searchFields   column keys the free-text search box matches against
- *   title, badge   toolbar copy
+ *   title          toolbar copy
  *   csvName        download filename
  * } */
 export function renderRawDump(opts) {
@@ -75,7 +75,6 @@ export function renderRawDump(opts) {
 
   html += '<div class="card"><div class="toolbar">' +
     '<input type="search" id="q" placeholder="' + esc(opts.searchPlaceholder) + '" value="' + esc(state.search) + '" />' +
-    '<span class="badge-lock">🔒 ' + esc(opts.badge) + "</span>" +
     (activeFilterKeys.length ? '<button class="icon-btn" id="clrFilters">Clear ' + activeFilterKeys.length + " filter(s)</button>" : "") +
     toolbarControlsHTML({ noAdd: true }) + "</div>";
 

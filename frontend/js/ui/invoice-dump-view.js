@@ -33,7 +33,6 @@ export function renderInvoiceDump() {
     dateKey: "invdate",
     searchFields: ["inv", "client", "item", "po", "so"],
     searchPlaceholder: "Search invoice no, client, item, PO, SO…",
-    badge: "Synced from Zoho Books — new invoices appear here automatically",
     totalField: "taxable",
     totalLabel: "Taxable value (view)",
     totalColLabel: "Taxable Amount",
