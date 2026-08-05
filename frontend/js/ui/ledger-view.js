@@ -14,6 +14,7 @@ import { loadMoreHTML, attachInfinite } from "./infinite-scroll.js";
 import { SEL } from "./selection.js";
 import { render } from "../core/bus.js";
 import { attachColumnFilters } from "./column-filter.js";
+import { attachDblClickEdit, stopEditingCell } from "./dblclick-edit.js";
 
 /* One filter/sort state per sheet (consol vs credit), so filtering Consol
    Sheet doesn't affect Credit Notes — persists across tab switches, like a
@@ -129,8 +130,8 @@ export function renderLedger(opts) {
         return '<td data-sel="1" class="' + (c.num ? "num " : "") + (ci === 0 ? "sticky-l " : "") +
           (c.f === "client" ? "cname " : "") + (c.edit ? "editable " : "") + (ed ? "edited" : "") + '"' +
           (c.num ? ' data-v="' + (Math.round((parseFloat(String(val).replace(/[^0-9.\-]/g, "")) || 0) * 100) / 100) + '"' : "") +
-          (c.edit ? ' contenteditable="true" data-ri="' + ri + '" data-f="' + c.f +
-            '" data-orig="' + esc(disp) + '" title="Click to edit — marked A for admin-edited"' : "") +
+          (c.edit ? ' data-ri="' + ri + '" data-f="' + c.f +
+            '" data-orig="' + esc(disp) + '" title="Double-click to edit — marked A for admin-edited"' : "") +
           ">" + esc(disp) + "</td>";
       }).join("") +
       mv.map(function (v) {
@@ -153,6 +154,7 @@ export function renderLedger(opts) {
   var tbEl = view.querySelector("#tb");
   if (tbEl) {
     var commitCell = function (td) {
+      stopEditingCell(td);
       var nv = td.textContent.trim();
       var orig = (td.getAttribute("data-orig") || "").trim();
       if (nv === orig) return;
@@ -173,8 +175,9 @@ export function renderLedger(opts) {
       var td = e.target && e.target.closest ? e.target.closest("td.editable") : null;
       if (!td) return;
       if (e.key === "Enter") { e.preventDefault(); commitCell(td); td.blur(); }
-      if (e.key === "Escape") { td.textContent = td.getAttribute("data-orig") || ""; td.blur(); }
+      if (e.key === "Escape") { td.textContent = td.getAttribute("data-orig") || ""; stopEditingCell(td); td.blur(); }
     });
+    attachDblClickEdit(tbEl, "td.editable");
   }
 
   if (idx.length) {

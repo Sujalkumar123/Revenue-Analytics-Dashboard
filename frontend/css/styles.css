@@ -271,9 +271,12 @@ tr.flagged td.sticky-l{box-shadow:inset 3px 0 0 var(--gold), 1px 0 0 var(--borde
 tr.isnew td{background:var(--new-soft)!important}
 tr.isnew td.sticky-l{box-shadow:inset 3px 0 0 var(--new), 1px 0 0 var(--border)}
 
-td.editable{cursor:text;position:relative}
+/* Single click only selects (cursor:cell, like any other cell) — a cell
+   only becomes text-editable on double-click, when it picks up
+   contenteditable dynamically and gets the .editing class below. */
+td.editable{cursor:cell;position:relative}
 td.editable:hover{outline:1px solid var(--accent);outline-offset:-1px;background:var(--accent-soft)!important}
-td.editable:focus{outline:2px solid var(--accent);outline-offset:-2px;background:var(--accent-soft)!important}
+td.editable.editing{cursor:text;outline:2px solid var(--accent);outline-offset:-2px;background:var(--accent-soft)!important}
 td.edited{background:var(--edit-soft)!important;color:var(--edit);font-weight:650}
 /* small "A" mark, top-right of the box — this value was typed by an admin,
    not sourced/computed. Faded so it reads as a footnote, not competes with

@@ -16,6 +16,7 @@ import { loadMoreHTML, attachInfinite } from "./infinite-scroll.js";
 import { SEL } from "./selection.js";
 import { render } from "../core/bus.js";
 import { attachColumnFilters } from "./column-filter.js";
+import { attachDblClickEdit, stopEditingCell } from "./dblclick-edit.js";
 
 /* One filter/sort state per tab (recurr, onetime, each product tab), keyed
    by state.tab so switching tabs doesn't leak one tab's client filter into
@@ -142,9 +143,9 @@ export function renderMatrix(opts) {
             return '<td data-sel="1" class="num ' + (Math.abs(v) < 0.5 ? "zero " : v < 0 ? "neg " : "") +
               (editable ? "editable " : "") + (r.ov[mi] ? "edited" : "") +
               '" data-v="' + (Math.round(v * 100) / 100) + '"' +
-              (editable ? ' contenteditable="true" data-mx="1" data-client="' + esc(r.name) +
+              (editable ? ' data-mx="1" data-client="' + esc(r.name) +
                 '" data-month="' + esc(months[mi].label) + '" data-orig="' + esc(disp) +
-                '" title="Type a figure to override this month for this client — marked A for admin-edited"' : "") +
+                '" title="Double-click to type a figure and override this month for this client — marked A for admin-edited"' : "") +
               ">" + disp + "</td>";
           }).join("") +
           '<td data-sel="1" class="num" data-v="' + (Math.round(r.total * 100) / 100) + '"><b>' + inr(r.total) + "</b></td></tr>";
@@ -156,6 +157,7 @@ export function renderMatrix(opts) {
     if (editable) {
       var tbEl = view.querySelector("#tb");
       var commitMx = function (td) {
+        stopEditingCell(td);
         var nv = td.textContent.trim();
         if (nv === (td.getAttribute("data-orig") || "").trim()) return;
         var key = mxKey(state.tab, metric, state.fy, td.getAttribute("data-month"), td.getAttribute("data-client"));
@@ -181,8 +183,9 @@ export function renderMatrix(opts) {
         var td = e.target && e.target.closest ? e.target.closest("td[data-mx]") : null;
         if (!td) return;
         if (e.key === "Enter") { e.preventDefault(); commitMx(td); td.blur(); }
-        if (e.key === "Escape") { td.textContent = td.getAttribute("data-orig") || ""; td.blur(); }
+        if (e.key === "Escape") { td.textContent = td.getAttribute("data-orig") || ""; stopEditingCell(td); td.blur(); }
       });
+      attachDblClickEdit(tbEl, "td[data-mx]");
     }
   }
 
