@@ -27,17 +27,6 @@ export var CREDIT_NOTE_DUMP_COLS = [
   { key: "taxable", label: "Taxable Amount", w: 130, num: true },
   { key: "usageFrom", label: "Usage Period (From)", w: 145 },
   { key: "usageTill", label: "Usage Period (Till)", w: 145 },
-  { key: "supplierGstin", label: "Supplier GST Reg. No.", w: 155 },
-  { key: "taxPct", label: "Item Tax %", w: 95, num: true },
-  { key: "hsn", label: "HSN/SAC", w: 100 },
-  { key: "cgst", label: "CGST", w: 90, num: true },
-  { key: "sgst", label: "SGST", w: 90, num: true },
-  { key: "igst", label: "IGST", w: 90, num: true },
-  { key: "branch", label: "Branch", w: 110 },
-  { key: "gstTreatment", label: "GST Treatment", w: 130 },
-  { key: "gstin", label: "GSTIN", w: 150 },
-  { key: "discount", label: "Discount Amount", w: 135 },
-  { key: "ref", label: "Reference#", w: 130 },
 ];
 
 export function renderCreditNoteDump() {
@@ -46,13 +35,13 @@ export function renderCreditNoteDump() {
     cols: CREDIT_NOTE_DUMP_COLS,
     getRows: function () { return (S.creditNoteDump && S.creditNoteDump.rows) || []; },
     dateKey: "cndate",
-    searchFields: ["cn", "client", "item", "gstin", "assocInv", "ref"],
-    searchPlaceholder: "Search credit note no, client, item, GSTIN, associated invoice…",
+    searchFields: ["cn", "client", "item", "assocInv"],
+    searchPlaceholder: "Search credit note no, client, item, associated invoice…",
     badge: "Read-only — raw export from Zoho Books",
     hasItemCol: true,
-    totalField: "itemTotal",
-    totalLabel: "Item total (view)",
-    totalColLabel: "Item Total",
+    totalField: "taxable",
+    totalLabel: "Taxable value (view)",
+    totalColLabel: "Taxable Amount",
     csvName: "Credit_Notes.csv"
   });
 }
