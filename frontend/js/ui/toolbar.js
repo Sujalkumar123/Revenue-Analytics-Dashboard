@@ -13,7 +13,8 @@ export function kpiCard(k, v, s, cls) {
     (s ? '<div class="s tab-num ' + (cls || "") + '">' + s + "</div>" : "") + "</div>";
 }
 
-export function toolbarControlsHTML() {
+export function toolbarControlsHTML(opts) {
+  var noAdd = opts && opts.noAdd;
   return '<span class="tb-right">' +
     /* Undo/redo isn't admin-only — filtering/sorting (also on the shared
        HISTORY stack) is something every role can do and undo. Only adding
@@ -22,7 +23,12 @@ export function toolbarControlsHTML() {
     '<button class="icon-btn" id="undoBtn" title="Undo (Ctrl+Z)"' + (HISTORY.canUndo() ? "" : " disabled") + ">↺</button>" +
     '<button class="icon-btn" id="redoBtn" title="Redo (Ctrl+U, or Ctrl+Shift+Z)"' + (HISTORY.canRedo() ? "" : " disabled") + ">↻</button>" +
     "</span>" +
-    (canEdit() ? '<button class="btn-primary" id="addBtn" title="Add a new client line">+ Add client</button>' : "") +
+    /* Invoice Dump / Credit Note are read-only mirrors of Zoho Books — a
+       new invoice or credit note shows up here on its own once synced, so
+       there's nothing to manually "add" from those tabs. Adding a client
+       is only meaningful on the tabs that actually store an editable line:
+       Invoice working, Credit Note Working, Recurring Revenue. */
+    (canEdit() && !noAdd ? '<button class="btn-primary" id="addBtn" title="Add a new client line">+ Add client</button>' : "") +
     '<select id="fySel" title="Financial year">' +
     FYS.map(function (f) {
       return '<option value="' + f.id + '"' + (f.id === state.fy ? " selected" : "") + ">" + f.label + "</option>";

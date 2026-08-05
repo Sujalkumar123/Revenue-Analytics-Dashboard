@@ -80,7 +80,7 @@ export function renderRawDump(opts) {
     '<span class="badge-lock">🔒 ' + esc(opts.badge) + "</span>" +
     (activeFilterKeys.length ? '<button class="icon-btn" id="clrFilters">Clear ' + activeFilterKeys.length + " filter(s)</button>" : "") +
     (opts.hasItemCol && canEdit() ? '<button class="icon-btn" id="itemMapBtn">🔤 Item → Product mapping</button>' : "") +
-    toolbarControlsHTML() + "</div>";
+    toolbarControlsHTML({ noAdd: true }) + "</div>";
 
   html += '<div class="grid-wrap" id="gw"><table class="grid"><thead><tr class="hdr-row">' +
     '<th class="rownum" style="width:38px"></th>' +
