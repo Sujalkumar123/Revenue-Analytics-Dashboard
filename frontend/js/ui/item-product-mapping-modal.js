@@ -1,8 +1,8 @@
 /* Admin tool: view/assign the Product for every distinct item name seen in
-   the current raw dump (Invoice Dump or Credit Note). Exists for exactly
-   the case described when this was built — a future item (e.g. a brand
-   new product's line item) shows up in the raw Zoho export with no known
-   Product, and an admin needs a way to assign one without editing code. */
+   the current ledger (Invoice working or Credit Note Working). Exists for
+   exactly the case described when this was built — a future item (e.g. a
+   brand new product's SKU) shows up with no known Product, and an admin
+   needs a way to assign one without editing code. */
 "use strict";
 
 import { esc } from "../core/format.js";
@@ -43,9 +43,10 @@ export function openItemProductMappingModal(itemNames) {
     "<p>" + items.length + " distinct items in this view" + (unmappedCount ? " · " + unmappedCount + " unmapped" : "") + "</p></div>" +
     '<button class="x" id="imClose" aria-label="Close">×</button></div>' +
     '<div class="modal-body">' +
-    '<div class="form-note">This is what a new item (e.g. a future product\'s line item) that Invoice Dump/Credit Note ' +
-    "hasn't seen a Product for yet looks like — the ⚠ rows below. Type a product for any row and click Save; it's " +
-    "remembered here going forward. Leave blank if that item genuinely has no product (many one-time/setup charges don't).</div>" +
+    '<div class="form-note">This is what a new item (e.g. a future product\'s SKU) that hasn\'t been seen before ' +
+    "looks like — the ⚠ rows below. Type a product for any row and click Save; it's remembered here going forward " +
+    "and applied automatically the next time that item name shows up. Leave blank if that item genuinely has no " +
+    "product (many one-time/setup charges don't).</div>" +
     '<datalist id="imapProducts">' + KNOWN_PRODUCTS.map(function (p) { return '<option value="' + esc(p) + '">'; }).join("") + "</datalist>" +
     '<div class="toolbar" style="padding:0 0 10px;border:none;background:none">' +
     '<input type="search" id="imSearch" placeholder="Search item names…" />' +

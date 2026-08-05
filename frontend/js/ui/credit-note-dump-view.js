@@ -38,7 +38,6 @@ export function renderCreditNoteDump() {
     searchFields: ["cn", "client", "item", "assocInv"],
     searchPlaceholder: "Search credit note no, client, item, associated invoice…",
     badge: "Synced from Zoho Books — new credit notes appear here automatically",
-    hasItemCol: true,
     totalField: "taxable",
     totalLabel: "Taxable value (view)",
     totalColLabel: "Taxable Amount",

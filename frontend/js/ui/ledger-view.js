@@ -1,4 +1,5 @@
-/* Line-item ledger view — Consol Sheet, Invoice Dump, Credit Notes. */
+/* Line-item ledger view — Invoice working (Consol Sheet) and Credit Note
+   Working. */
 "use strict";
 
 import { fyMonths } from "../core/dates.js";
@@ -15,6 +16,7 @@ import { SEL } from "./selection.js";
 import { render } from "../core/bus.js";
 import { attachColumnFilters } from "./column-filter.js";
 import { attachDblClickEdit, stopEditingCell } from "./dblclick-edit.js";
+import { openItemProductMappingModal } from "./item-product-mapping-modal.js";
 
 /* One filter/sort state per sheet (consol vs credit), so filtering Consol
    Sheet doesn't affect Credit Notes — persists across tab switches, like a
@@ -93,6 +95,7 @@ export function renderLedger(opts) {
       (state.flagOnly ? "✓ " : "") + "Needs attention (" + flagged + ")</button>" : "") +
     (edits && !locked ? '<button class="icon-btn" id="clrEdits">Reset ' + edits + " edit(s)</button>" : "") +
     (activeFilterKeys.length ? '<button class="icon-btn" id="clrFilters">Clear ' + activeFilterKeys.length + " filter(s)</button>" : "") +
+    (!locked ? '<button class="icon-btn" id="itemMapBtn">🔤 Item → Product mapping</button>' : "") +
     toolbarControlsHTML() + "</div>";
 
   var cols = locked
@@ -201,6 +204,12 @@ export function renderLedger(opts) {
   });
   var of = view.querySelector("#onlyFlag");
   if (of) of.addEventListener("click", function () { state.flagOnly = !state.flagOnly; render(); });
+  var imBtn = view.querySelector("#itemMapBtn");
+  if (imBtn) imBtn.addEventListener("click", function () {
+    var items = [];
+    for (var ri = 0; ri < ds.rows.length; ri++) items.push(fieldVal(ds, sheet, ri, "item"));
+    openItemProductMappingModal(items);
+  });
   var clrF = view.querySelector("#clrFilters");
   if (clrF) clrF.addEventListener("click", function () {
     var prev = vstate.filters;

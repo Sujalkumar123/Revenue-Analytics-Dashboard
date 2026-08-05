@@ -9,12 +9,10 @@
 import { esc, inr } from "../core/format.js";
 import { fyMonths, parseUserDate } from "../core/dates.js";
 import { state, curFY } from "../state/app-state.js";
-import { canEdit } from "../state/auth.js";
 import { kpiCard, toolbarControlsHTML, wireSearchSort } from "./toolbar.js";
 import { loadMoreHTML, attachInfinite } from "./infinite-scroll.js";
 import { SEL } from "./selection.js";
 import { attachColumnFilters } from "./column-filter.js";
-import { openItemProductMappingModal } from "./item-product-mapping-modal.js";
 import { HISTORY } from "../state/history.js";
 import { render } from "../core/bus.js";
 
@@ -79,7 +77,6 @@ export function renderRawDump(opts) {
     '<input type="search" id="q" placeholder="' + esc(opts.searchPlaceholder) + '" value="' + esc(state.search) + '" />' +
     '<span class="badge-lock">🔒 ' + esc(opts.badge) + "</span>" +
     (activeFilterKeys.length ? '<button class="icon-btn" id="clrFilters">Clear ' + activeFilterKeys.length + " filter(s)</button>" : "") +
-    (opts.hasItemCol && canEdit() ? '<button class="icon-btn" id="itemMapBtn">🔤 Item → Product mapping</button>' : "") +
     toolbarControlsHTML({ noAdd: true }) + "</div>";
 
   html += '<div class="grid-wrap" id="gw"><table class="grid"><thead><tr class="hdr-row">' +
@@ -149,11 +146,6 @@ export function renderRawDump(opts) {
       return out.sort();
     }
   );
-
-  var imBtn = view.querySelector("#itemMapBtn");
-  if (imBtn) imBtn.addEventListener("click", function () {
-    openItemProductMappingModal(all.map(function (r) { return r.item; }));
-  });
 
   var clrF = view.querySelector("#clrFilters");
   if (clrF) clrF.addEventListener("click", function () {
