@@ -1,60 +1,60 @@
-/* Admin tool: view/assign the Product for every distinct item name seen in
-   the current ledger (Invoice working or Credit Note Working). Exists for
-   exactly the case described when this was built — a future item (e.g. a
-   brand new product's SKU) shows up with no known Product, and an admin
-   needs a way to assign one without editing code. */
+/* Admin tool: assign the Product for items that don't have one yet — a
+   future/new SKU showing up in Invoice working or Credit Note Working with
+   no known Product. Deliberately scoped to just those rows, not a browsable
+   directory of every item ever seen: the button only appears when there's
+   something new to classify, and the modal opens straight to that list. */
 "use strict";
 
 import { esc } from "../core/format.js";
-import { getProduct, setProduct, clearOverride } from "../state/item-product-map.js";
+import { getProduct, setProduct } from "../state/item-product-map.js";
 import { toast } from "./toast.js";
 import { render } from "../core/bus.js";
 
 var KNOWN_PRODUCTS = ["GT subscription", "DMS subscription", "MT subscription", "Flo subscription", "Other modules"];
+
+export function unmappedItemCount(itemNames) {
+  var items = Array.from(new Set(itemNames.filter(Boolean)));
+  return items.filter(function (it) { return getProduct(it) === null; }).length;
+}
 
 export function openItemProductMappingModal(itemNames) {
   var wrap = document.createElement("div");
   wrap.className = "modal-backdrop";
   wrap.id = "itemMapModal";
 
-  var items = Array.from(new Set(itemNames.filter(Boolean))).sort();
+  var items = Array.from(new Set(itemNames.filter(Boolean)))
+    .filter(function (it) { return getProduct(it) === null; })
+    .sort();
 
-  function rowsHTML(filterText, unmappedOnly) {
+  function rowsHTML(filterText) {
     var ft = (filterText || "").toLowerCase();
     return items
       .filter(function (it) { return it.toLowerCase().indexOf(ft) !== -1; })
-      .filter(function (it) { return !unmappedOnly || getProduct(it) === null; })
       .map(function (it) {
-        var current = getProduct(it);
-        var unmapped = current === null;
-        return '<div class="imap-row' + (unmapped ? " imap-unmapped" : "") + '" data-item="' + esc(it) + '">' +
+        return '<div class="imap-row imap-unmapped" data-item="' + esc(it) + '">' +
           '<span class="imap-name" title="' + esc(it) + '">' + esc(it) + "</span>" +
-          '<input class="imap-input" list="imapProducts" placeholder="' + (unmapped ? "Unmapped — type a product…" : "(blank = no product)") +
-          '" value="' + esc(current === null ? "" : current) + '" />' +
-          (unmapped ? '<span class="imap-flag" title="No mapping found">⚠</span>' : "") +
+          '<input class="imap-input" list="imapProducts" placeholder="Type a product…" value="" />' +
+          '<span class="imap-flag" title="No mapping yet">⚠</span>' +
           "</div>";
-      }).join("") || '<div style="padding:16px;text-align:center;color:var(--ink-3)">No items match.</div>';
+      }).join("") || '<div style="padding:16px;text-align:center;color:var(--ink-3)">No new items — everything\'s mapped.</div>';
   }
-
-  var unmappedCount = items.filter(function (it) { return getProduct(it) === null; }).length;
 
   wrap.innerHTML =
     '<div class="modal" role="dialog" aria-modal="true">' +
-    '<div class="modal-hd"><div><h3>Item → Product mapping</h3>' +
-    "<p>" + items.length + " distinct items in this view" + (unmappedCount ? " · " + unmappedCount + " unmapped" : "") + "</p></div>" +
+    '<div class="modal-hd"><div><h3>New items</h3>' +
+    "<p>" + items.length + " item" + (items.length === 1 ? "" : "s") + " need a product assigned</p></div>" +
     '<button class="x" id="imClose" aria-label="Close">×</button></div>' +
     '<div class="modal-body">' +
-    '<div class="form-note">This is what a new item (e.g. a future product\'s SKU) that hasn\'t been seen before ' +
-    "looks like — the ⚠ rows below. Type a product for any row and click Save; it's remembered here going forward " +
-    "and applied automatically the next time that item name shows up. Leave blank if that item genuinely has no " +
-    "product (many one-time/setup charges don't).</div>" +
+    '<div class="form-note">These are item names showing up in the ledger that don\'t have a product yet — ' +
+    "usually a brand new SKU. Type a product and click Save; it's remembered going forward and applied " +
+    "automatically the next time that item name shows up. Leave blank if it genuinely has no product " +
+    "(many one-time/setup charges don't).</div>" +
     '<datalist id="imapProducts">' + KNOWN_PRODUCTS.map(function (p) { return '<option value="' + esc(p) + '">'; }).join("") + "</datalist>" +
-    '<div class="toolbar" style="padding:0 0 10px;border:none;background:none">' +
-    '<input type="search" id="imSearch" placeholder="Search item names…" />' +
-    '<label class="colf-item" style="width:auto;padding:6px 9px;border:1px solid var(--border);border-radius:var(--radius-sm)">' +
-    '<input type="checkbox" id="imUnmappedOnly"' + (unmappedCount ? "" : " disabled") + ' /> Unmapped only</label>' +
-    "</div>" +
-    '<div id="imList" class="imap-list">' + rowsHTML("", false) + "</div>" +
+    (items.length > 8
+      ? '<div class="toolbar" style="padding:0 0 10px;border:none;background:none">' +
+        '<input type="search" id="imSearch" placeholder="Search item names…" /></div>'
+      : "") +
+    '<div id="imList" class="imap-list">' + rowsHTML("") + "</div>" +
     "</div>" +
     '<div class="modal-ft"><span class="err" id="imErr"></span><span class="spacer"></span>' +
     '<button class="icon-btn" id="imCancel">Close</button>' +
@@ -63,10 +63,7 @@ export function openItemProductMappingModal(itemNames) {
 
   var listEl = wrap.querySelector("#imList");
   var searchEl = wrap.querySelector("#imSearch");
-  var unmappedOnlyEl = wrap.querySelector("#imUnmappedOnly");
-  function repaint() { listEl.innerHTML = rowsHTML(searchEl.value, unmappedOnlyEl.checked); }
-  searchEl.addEventListener("input", repaint);
-  unmappedOnlyEl.addEventListener("change", repaint);
+  if (searchEl) searchEl.addEventListener("input", function () { listEl.innerHTML = rowsHTML(searchEl.value); });
 
   function close() { wrap.remove(); }
   wrap.querySelector("#imClose").addEventListener("click", close);
@@ -78,12 +75,8 @@ export function openItemProductMappingModal(itemNames) {
     var changed = 0;
     rows.forEach(function (row) {
       var item = row.getAttribute("data-item");
-      var input = row.querySelector(".imap-input");
-      var typed = input.value.trim();
-      var before = getProduct(item);
-      if (typed === "" && before === null) return;   // still unmapped, nothing to save
-      if (typed === (before === null ? "" : before)) return;
-      if (typed === "" && before !== null) { clearOverride(item); changed++; return; }
+      var typed = row.querySelector(".imap-input").value.trim();
+      if (typed === "") return;   // still unmapped, nothing to save
       setProduct(item, typed);
       changed++;
     });

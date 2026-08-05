@@ -16,7 +16,7 @@ import { SEL } from "./selection.js";
 import { render } from "../core/bus.js";
 import { attachColumnFilters } from "./column-filter.js";
 import { attachDblClickEdit, stopEditingCell } from "./dblclick-edit.js";
-import { openItemProductMappingModal } from "./item-product-mapping-modal.js";
+import { openItemProductMappingModal, unmappedItemCount } from "./item-product-mapping-modal.js";
 
 /* One filter/sort state per sheet (consol vs credit), so filtering Consol
    Sheet doesn't affect Credit Notes — persists across tab switches, like a
@@ -83,6 +83,10 @@ export function renderLedger(opts) {
 
   var locked = opts.readOnly || !canEdit();
 
+  var allItems = [];
+  for (var aj = 0; aj < ds.rows.length; aj++) allItems.push(fieldVal(ds, sheet, aj, "item"));
+  var newItems = locked ? 0 : unmappedItemCount(allItems);
+
   html += '<div class="card"><div class="toolbar">' +
     '<input type="search" id="q" placeholder="Search invoice no, client, item…" value="' + esc(state.search) + '" />' +
     (opts.readOnly
@@ -93,7 +97,7 @@ export function renderLedger(opts) {
       (state.flagOnly ? "Showing needs attention (" : "Needs attention (") + flagged + ")</button>" : "") +
     (edits && !locked ? '<button class="icon-btn" id="clrEdits">Reset ' + edits + " edit(s)</button>" : "") +
     (activeFilterKeys.length ? '<button class="icon-btn" id="clrFilters">Clear ' + activeFilterKeys.length + " filter(s)</button>" : "") +
-    (!locked ? '<button class="chip-tool" id="itemMapBtn">🔤 Item → Product mapping</button>' : "") +
+    (newItems ? '<button class="chip-tool" id="itemMapBtn">⚠ New items (' + newItems + ") — assign a product</button>" : "") +
     toolbarControlsHTML({ noExport: true }) + "</div>";
 
   var cols = locked
@@ -203,11 +207,7 @@ export function renderLedger(opts) {
   var of = view.querySelector("#onlyFlag");
   if (of) of.addEventListener("click", function () { state.flagOnly = !state.flagOnly; render(); });
   var imBtn = view.querySelector("#itemMapBtn");
-  if (imBtn) imBtn.addEventListener("click", function () {
-    var items = [];
-    for (var ri = 0; ri < ds.rows.length; ri++) items.push(fieldVal(ds, sheet, ri, "item"));
-    openItemProductMappingModal(items);
-  });
+  if (imBtn) imBtn.addEventListener("click", function () { openItemProductMappingModal(allItems); });
   var clrF = view.querySelector("#clrFilters");
   if (clrF) clrF.addEventListener("click", function () {
     var prev = vstate.filters;
