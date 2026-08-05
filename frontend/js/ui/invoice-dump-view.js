@@ -20,14 +20,9 @@ export var INVOICE_DUMP_COLS = [
   { key: "taxable", label: "Taxable Amount", w: 130, num: true },
   { key: "usageFrom", label: "Usage Period (From)", w: 145 },
   { key: "usageTill", label: "Usage Period (Till)", w: 145 },
-  { key: "gstin", label: "GSTIN", w: 150 },
   { key: "po", label: "Purchase Order", w: 150 },
   { key: "so", label: "Sales Order No.", w: 150 },
   { key: "discount", label: "Discount Amount", w: 135 },
-  { key: "branch", label: "Branch", w: 110 },
-  { key: "cgst", label: "CGST", w: 90, num: true },
-  { key: "sgst", label: "SGST", w: 90, num: true },
-  { key: "igst", label: "IGST", w: 90, num: true },
 ];
 
 export function renderInvoiceDump() {
@@ -36,13 +31,13 @@ export function renderInvoiceDump() {
     cols: INVOICE_DUMP_COLS,
     getRows: function () { return (S.invoiceDump && S.invoiceDump.rows) || []; },
     dateKey: "invdate",
-    searchFields: ["inv", "client", "item", "gstin", "po", "so"],
-    searchPlaceholder: "Search invoice no, client, item, GSTIN, PO, SO…",
+    searchFields: ["inv", "client", "item", "po", "so"],
+    searchPlaceholder: "Search invoice no, client, item, PO, SO…",
     badge: "Read-only — raw export from Zoho Books",
     hasItemCol: true,
-    totalField: "total",
-    totalLabel: "Item total (view)",
-    totalColLabel: "Item Total",
+    totalField: "taxable",
+    totalLabel: "Taxable value (view)",
+    totalColLabel: "Taxable Amount",
     csvName: "Invoice_Dump.csv"
   });
 }

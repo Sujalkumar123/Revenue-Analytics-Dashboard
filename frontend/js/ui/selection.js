@@ -17,6 +17,22 @@ var anchor = null;        // {r,c} fixed corner of the ACTIVE (last) range
 var excluded = {};        // "r,c" keys punched out of a range by Ctrl+click (Excel-style hole)
 var dragging = false, wrap = null, tbody = null, bar = null;
 var firstSelCol = null, lastSelCol = null;   // span of selectable columns, for row-number/title picks
+var rowDragMode = false;   // true while dragging FROM a row handle — extends whole rows, not just one column
+var autoScrollActive = false, autoScrollDy = 0, autoScrollX = 0, autoScrollY = 0, autoScrollRAF = null, autoScrollTimer = null;
+/* A "straight down/up" drag from a plain cell still has a few px of natural
+   hand jitter side to side — without this, that jitter alone was enough to
+   smear the selection across neighbouring columns instead of staying in
+   the one column the user actually meant to drag down. Column stays
+   pinned to whatever cell the drag started on until the cursor moves
+   COL_LOCK_PX away from its starting X, which reads as a deliberate
+   sideways drag (for picking an actual multi-column rectangle) rather
+   than jitter. */
+var COL_LOCK_PX = 18;
+var dragStartC = null, dragStartX = 0;
+function dragCol(hoverC, curX) {
+  if (rowDragMode || dragStartC === null) return hoverC;
+  return Math.abs(curX - dragStartX) < COL_LOCK_PX ? dragStartC : hoverC;
+}
 
 function cells() { return tbody ? tbody.rows : []; }
 
@@ -177,11 +193,71 @@ function endPan() {
   if (wrap) wrap.classList.remove("panning");
 }
 
+/* While a range/row drag is held near the top or bottom edge of the grid,
+   auto-scroll it (like Excel) so selection can extend past what's on
+   screen — infinite-scroll's own listeners react to scrollTop changes no
+   matter how they happen, so more rows stream in as this scrolls. Re-reads
+   whatever's under the (clamped) cursor every frame so the selection keeps
+   growing even while the mouse itself sits still. */
+function autoScrollStep() {
+  if (!autoScrollActive || !wrap) return;
+  wrap.scrollTop += autoScrollDy;
+  var rect = wrap.getBoundingClientRect();
+  var y = Math.max(rect.top + 1, Math.min(autoScrollY, rect.bottom - 1));
+  var el = document.elementFromPoint(autoScrollX, y);
+  var td = el && el.closest ? el.closest("td") : null;
+  if (td) {
+    var p = posOf(td);
+    if (p) {
+      if (rowDragMode) extendActive(p.r, lastSelCol);
+      else extendActive(p.r, dragCol(p.c, autoScrollX));
+      paintAll();
+    }
+  }
+  autoScrollRAF = requestAnimationFrame(autoScrollStep);
+}
+/* setInterval as a second, independent driver alongside the rAF loop
+   above — rAF can stall out mid-drag in some browsers/conditions (heavy
+   synchronous work on the main thread from paintAll, or frame throttling
+   while a native drag is held), and when it does, the auto-scroll would
+   otherwise just quietly stop. The interval doesn't depend on frame
+   compositing at all, so it keeps things moving even then. */
+function autoScrollTick() { autoScrollStep(); }
+function startAutoScroll() {
+  if (autoScrollActive) return;
+  autoScrollActive = true;
+  autoScrollStep();
+  autoScrollTimer = setInterval(autoScrollTick, 60);
+}
+function stopAutoScroll() {
+  autoScrollActive = false;
+  if (autoScrollRAF) cancelAnimationFrame(autoScrollRAF);
+  autoScrollRAF = null;
+  if (autoScrollTimer) clearInterval(autoScrollTimer);
+  autoScrollTimer = null;
+}
+function maybeAutoScroll(clientX, clientY) {
+  if (!wrap) return;
+  var rect = wrap.getBoundingClientRect();
+  var EDGE = 48, SPEED = 18;
+  var dy = 0;
+  if (clientY < rect.top + EDGE) dy = -SPEED * ((rect.top + EDGE - clientY) / EDGE);
+  else if (clientY > rect.bottom - EDGE) dy = SPEED * ((clientY - (rect.bottom - EDGE)) / EDGE);
+  autoScrollX = clientX; autoScrollY = clientY;
+  if (dy) {
+    autoScrollDy = dy;
+    startAutoScroll();
+  } else {
+    stopAutoScroll();
+  }
+}
+
 function attach(gridWrap) {
   wrap = gridWrap;
   tbody = wrap.querySelector("tbody");
   ranges = []; anchor = null; pending = null; hideBar();
-  firstSelCol = lastSelCol = null;
+  firstSelCol = lastSelCol = null; rowDragMode = false; stopAutoScroll();
+  dragStartC = null; dragStartX = 0;
   if (!tbody) return;
 
   var firstRow = tbody.rows[0];
@@ -196,13 +272,28 @@ function attach(gridWrap) {
 
   wrap.addEventListener("mousedown", function (e) {
     if (e.button === 1) { e.preventDefault(); beginPan(e); return; }
-    /* Row-number cells, the sticky title column, and the column header all
-       have their own click handlers (below) with their own Ctrl/Shift
-       handling — bail out here without clearing, or a Ctrl/Shift click on
-       any of them would wipe the very selection those modifiers are meant
+    /* The column header has its own click handler (below) with its own
+       Ctrl/Shift handling — bail out here without clearing, or a Ctrl/Shift
+       click on it would wipe the very selection those modifiers are meant
        to add to, before its own handler ever runs. */
-    if (e.target.closest && (e.target.closest("thead") || isRowHandle(e.target.closest("td")))) return;
+    if (e.target.closest && e.target.closest("thead")) return;
     var td = e.target.closest ? e.target.closest("td") : null;
+    /* Row handle (row-number or sticky title column): mousedown starts a
+       whole-row selection AND arms drag mode, so dragging up/down from here
+       multi-selects rows (for a running sum) instead of only picking one
+       row per click. */
+    if (isRowHandle(td) && firstSelCol !== null) {
+      var rp = posOf(td);
+      if (!rp) return;
+      e.preventDefault();
+      if (e.shiftKey) extendActive(rp.r, lastSelCol);
+      else if (e.ctrlKey || e.metaKey) toggleRange(rp.r, rp.r, firstSelCol, lastSelCol);
+      else startRange(rp.r, rp.r, firstSelCol, lastSelCol);
+      paintAll();
+      rowDragMode = true;
+      beginDrag();
+      return;
+    }
     if (!selectable(td)) { if (!e.target.closest(".statusbar")) clear(); return; }
     var p = posOf(td);
     if (!p) return;
@@ -235,6 +326,7 @@ function attach(gridWrap) {
         pushRange(p.r, p.r, p.c, p.c);
         beginDrag();
       }
+      dragStartC = p.c; dragStartX = e.clientX;
       paintAll();
       return;
     }
@@ -246,6 +338,7 @@ function attach(gridWrap) {
        caret normally right after. If the mouse then moves before release,
        this 1-cell selection grows into a drag range (see mousemove). */
     downXY = { x: e.clientX, y: e.clientY };
+    dragStartC = p.c; dragStartX = e.clientX;
     startRange(p.r, p.r, p.c, p.c);
     paintAll();
     if (td.isContentEditable) {
@@ -256,23 +349,6 @@ function attach(gridWrap) {
     }
   });
   wrap.addEventListener("auxclick", function (e) { if (e.button === 1) e.preventDefault(); });
-  wrap.addEventListener("mousemove", function (e) {
-    if (panning) {
-      wrap.scrollLeft = panL - (e.clientX - panX);
-      wrap.scrollTop = panT - (e.clientY - panY);
-      return;
-    }
-    if (pending && downXY) {
-      var moved = Math.abs(e.clientX - downXY.x) + Math.abs(e.clientY - downXY.y);
-      if (moved > 5) { beginDrag(); }
-      else return;
-    }
-    if (!dragging) return;
-    var td = e.target.closest ? e.target.closest("td") : null;
-    if (!td) return;
-    var p = posOf(td);
-    if (p) { extendActive(p.r, p.c); paintAll(); }
-  });
 
   /* column header: click = that column; Ctrl = add a disjoint column;
      Shift = extend from the active range's column to this one */
@@ -294,26 +370,45 @@ function attach(gridWrap) {
     });
   }
 
-  /* row-number cell OR the sticky title column (first data column — every
-     tab's row identifier, e.g. Client/Invoice No./Date): click = that
-     row's cells; Ctrl = add a disjoint row; Shift = extend from the active
-     range's row to this one. */
-  tbody.addEventListener("click", function (e) {
-    var td = e.target.closest ? e.target.closest("td") : null;
-    if (!isRowHandle(td) || firstSelCol === null) return;
-    var p = posOf(td);
-    if (!p) return;
-    if (e.shiftKey) extendActive(p.r, lastSelCol);
-    else if (e.ctrlKey || e.metaKey) toggleRange(p.r, p.r, firstSelCol, lastSelCol);
-    else startRange(p.r, p.r, firstSelCol, lastSelCol);
-    paintAll();
-  });
 }
 
+/* Deliberately on document, not wrap: once a drag is armed, the pointer
+   routinely strays off the grid element itself — over the fixed status bar
+   sitting right at the bottom of the screen (exactly where a downward drag
+   heads), past the table's edges, over the header row, whatever. A
+   listener scoped to wrap only fires while the pointer is directly over
+   it, so the selection would appear to freeze mid-drag the moment the
+   cursor left that box. elementFromPoint sidesteps that by finding
+   whatever's under the cursor regardless of which element the event
+   actually landed on. */
+document.addEventListener("mousemove", function (e) {
+  if (!wrap) return;
+  if (panning) {
+    wrap.scrollLeft = panL - (e.clientX - panX);
+    wrap.scrollTop = panT - (e.clientY - panY);
+    return;
+  }
+  if (pending && downXY) {
+    var moved = Math.abs(e.clientX - downXY.x) + Math.abs(e.clientY - downXY.y);
+    if (moved > 5) { beginDrag(); }
+    else return;
+  }
+  if (!dragging) return;
+  maybeAutoScroll(e.clientX, e.clientY);
+  var el = document.elementFromPoint(e.clientX, e.clientY);
+  var td = el && el.closest ? el.closest("td") : null;
+  if (!td) return;
+  var p = posOf(td);
+  if (!p) return;
+  if (rowDragMode) extendActive(p.r, lastSelCol);
+  else extendActive(p.r, dragCol(p.c, e.clientX));
+  paintAll();
+});
 document.addEventListener("mouseup", function (e) {
   pending = null; downXY = null;
   if (e.button === 1) endPan();
-  if (dragging) { dragging = false; if (wrap) wrap.classList.remove("selecting"); }
+  if (dragging) { dragging = false; rowDragMode = false; dragStartC = null; if (wrap) wrap.classList.remove("selecting"); }
+  stopAutoScroll();
 });
 document.addEventListener("keydown", function (e) { if (e.key === "Escape") clear(); });
 
