@@ -290,6 +290,9 @@ td.sel{background:var(--sel)!important}
    can't compose, since each would just overwrite the same CSS property */
 td.sel-anchor{outline:2px solid var(--sel-edge);outline-offset:-2px}
 .grid-wrap.selecting{user-select:none;cursor:cell}
+.grid-wrap.panning{user-select:none;cursor:grabbing}
+/* the sticky title column (and row-number gutter) act as row selectors now */
+td.sticky-l{cursor:pointer}
 
 .statusbar{
   position:fixed;right:16px;bottom:14px;z-index:60;display:flex;align-items:stretch;

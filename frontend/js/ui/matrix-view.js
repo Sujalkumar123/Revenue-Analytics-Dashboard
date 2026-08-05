@@ -136,10 +136,10 @@ export function renderMatrix(opts) {
       for (var i = from; i < to; i++) {
         var r = rows[i];
         out += '<tr><td class="rownum" title="Click to select this row · Ctrl+click to add another">' + (i + 1) + "</td>" +
-          '<td class="sticky-l cname" title="' + esc(r.name) + '">' + esc(r.name) + "</td>" +
+          '<td data-sel="1" class="sticky-l cname" title="' + esc(r.name) + '">' + esc(r.name) + "</td>" +
           r.vals.map(function (v, mi) {
             var disp = inr(v);
-            return '<td class="num ' + (Math.abs(v) < 0.5 ? "zero " : v < 0 ? "neg " : "") +
+            return '<td data-sel="1" class="num ' + (Math.abs(v) < 0.5 ? "zero " : v < 0 ? "neg " : "") +
               (editable ? "editable " : "") + (r.ov[mi] ? "edited" : "") +
               '" data-v="' + (Math.round(v * 100) / 100) + '"' +
               (editable ? ' contenteditable="true" data-mx="1" data-client="' + esc(r.name) +
@@ -147,7 +147,7 @@ export function renderMatrix(opts) {
                 '" title="Type a figure to override this month for this client — marked A for admin-edited"' : "") +
               ">" + disp + "</td>";
           }).join("") +
-          '<td class="num" data-v="' + (Math.round(r.total * 100) / 100) + '"><b>' + inr(r.total) + "</b></td></tr>";
+          '<td data-sel="1" class="num" data-v="' + (Math.round(r.total * 100) / 100) + '"><b>' + inr(r.total) + "</b></td></tr>";
       }
       return out;
     });

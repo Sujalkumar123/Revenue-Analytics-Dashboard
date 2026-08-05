@@ -1,9 +1,13 @@
-/* Excel-style range selection over a grid's value cells: plain drag = one
-   rectangle (replaces any previous selection); Ctrl+drag/click = ADD a new,
-   disjoint rectangle, or punch/un-punch a single cell out of a bigger one;
-   Shift+click extends the most recently added rectangle from its own
-   anchor. Row-number cells pick a whole row; column headers pick a whole
-   column; both support the same Ctrl/Shift modifiers. */
+/* Excel-style range selection over every column of a grid (not just numeric
+   ones): plain drag = one rectangle (replaces any previous selection);
+   Ctrl+drag/click = ADD a new, disjoint rectangle, or punch/un-punch a
+   single cell out of a bigger one; Shift+click extends the most recently
+   added rectangle from its own anchor. Row-number cells AND the sticky
+   "title" column (first data column — Client/Invoice No./Date, whichever a
+   given tab uses) both pick a whole row; column headers pick a whole
+   column; all three support the same Ctrl/Shift modifiers. Middle-mouse-
+   button drag pans/scrolls the grid — deliberately a different gesture
+   from left-click, so it never competes with range selection. */
 "use strict";
 
 import { inr } from "../core/format.js";
@@ -12,7 +16,7 @@ var ranges = [];          // [{r0,r1,c0,c1}, ...] — committed + the live one b
 var anchor = null;        // {r,c} fixed corner of the ACTIVE (last) range
 var excluded = {};        // "r,c" keys punched out of a range by Ctrl+click (Excel-style hole)
 var dragging = false, wrap = null, tbody = null, bar = null;
-var firstValCol = null, lastValCol = null;   // span of data-v columns, for row-number picks
+var firstSelCol = null, lastSelCol = null;   // span of selectable columns, for row-number/title picks
 
 function cells() { return tbody ? tbody.rows : []; }
 
@@ -32,7 +36,7 @@ function clearMarks() {
     marked[i].classList.remove("sel", "sel-anchor");
     marked[i].style.boxShadow = "";
   }
-  var rn = tbody.querySelectorAll("td.rownum.row-sel");
+  var rn = tbody.querySelectorAll("td.row-sel");
   for (var j = 0; j < rn.length; j++) rn[j].classList.remove("row-sel");
   var head = wrap.querySelector("thead tr.hdr-row");
   if (head) {
@@ -56,7 +60,7 @@ function paintAll() {
   clearMarks();
   var rows = cells();
   if (!ranges.length) { hideBar(); return; }
-  var seen = {}, n = 0, sum = 0, min = Infinity, max = -Infinity;
+  var seen = {}, cellCount = 0, numCount = 0, sum = 0, min = Infinity, max = -Infinity;
   var head = wrap.querySelector("thead tr.hdr-row");
 
   ranges.forEach(function (rg) {
@@ -72,14 +76,15 @@ function paintAll() {
         rowHasSel = true;
         if (!seen[key]) {
           seen[key] = 1;
+          cellCount++;
           var v = td.getAttribute("data-v");
           if (v !== null && v !== "") {
             var num = parseFloat(v);
-            if (!isNaN(num)) { n++; sum += num; if (num < min) min = num; if (num > max) max = num; }
+            if (!isNaN(num)) { numCount++; sum += num; if (num < min) min = num; if (num > max) max = num; }
           }
         }
       }
-      if (rowHasSel && tr.cells[0] && tr.cells[0].classList.contains("rownum")) tr.cells[0].classList.add("row-sel");
+      if (rowHasSel && tr.cells[0]) tr.cells[0].classList.add("row-sel");
     }
     var colFullySel = true;
     for (var rr = rg.r0; rr <= rg.r1 && rr < rows.length; rr++) if (excluded[rr + "," + rg.c0]) { colFullySel = false; break; }
@@ -91,10 +96,10 @@ function paintAll() {
   if (anchor && rows[anchor.r] && rows[anchor.r].cells[anchor.c]) {
     rows[anchor.r].cells[anchor.c].classList.add("sel-anchor");
   }
-  showBar(n, sum, min, max, ranges);
+  showBar(cellCount, numCount, sum, min, max);
 }
 
-function showBar(n, sum, min, max, rgs) {
+function showBar(cellCount, numCount, sum, min, max) {
   if (!bar) {
     bar = document.createElement("div");
     bar.className = "statusbar";
@@ -102,14 +107,14 @@ function showBar(n, sum, min, max, rgs) {
     bar.addEventListener("mousedown", function (e) { e.stopPropagation(); });
     bar.addEventListener("click", function (e) { if (e.target.closest(".clear")) clear(); });
   }
-  var avg = n ? sum / n : 0;
+  var avg = numCount ? sum / numCount : 0;
   var num = function (v) { return Math.abs(v) < 0.5 ? "0" : inr(v); };
   bar.innerHTML =
-    '<div class="stat"><div class="sk">Count</div><div class="sv tab-num">' + n.toLocaleString("en-IN") + "</div></div>" +
-    '<div class="stat"><div class="sk">Sum</div><div class="sv accent tab-num">' + (n ? "₹" + num(sum) : "–") + "</div></div>" +
-    '<div class="stat"><div class="sk">Average</div><div class="sv tab-num">' + (n ? "₹" + num(avg) : "–") + "</div></div>" +
+    '<div class="stat"><div class="sk">Count</div><div class="sv tab-num">' + cellCount.toLocaleString("en-IN") + "</div></div>" +
+    '<div class="stat"><div class="sk">Sum</div><div class="sv accent tab-num">' + (numCount ? "₹" + num(sum) : "–") + "</div></div>" +
+    '<div class="stat"><div class="sk">Average</div><div class="sv tab-num">' + (numCount ? "₹" + num(avg) : "–") + "</div></div>" +
     '<div class="stat"><div class="sk">Min / Max</div><div class="sv tab-num" style="font-size:11.5px">' +
-      (n ? "₹" + num(min) + " / ₹" + num(max) : "–") + "</div></div>" +
+      (numCount ? "₹" + num(min) + " / ₹" + num(max) : "–") + "</div></div>" +
     '<button class="clear" title="Clear selection (Esc)">×</button>';
 }
 
@@ -118,7 +123,11 @@ function posOf(td) {
   if (!tr || tr.parentElement !== tbody) return null;
   return { r: tr.sectionRowIndex, c: td.cellIndex };
 }
-function selectable(td) { return td && td.tagName === "TD" && td.hasAttribute("data-v"); }
+/* Any td with content participates in range selection now — not just
+   numeric ones. data-v (present only on numeric cells) still separately
+   drives the Sum/Average/Min-Max stats. */
+function selectable(td) { return td && td.tagName === "TD" && td.hasAttribute("data-sel"); }
+function isRowHandle(td) { return td && (td.classList.contains("rownum") || td.classList.contains("sticky-l")); }
 
 function startRange(r0, r1, c0, c1) { ranges = [{ r0: r0, r1: r1, c0: c0, c1: c1 }]; anchor = { r: r0, c: c0 }; excluded = {}; }
 function pushRange(r0, r1, c0, c1) { ranges.push({ r0: r0, r1: r1, c0: c0, c1: c1 }); anchor = { r: r0, c: c0 }; }
@@ -153,30 +162,46 @@ function beginDrag() {
   wrap.classList.add("selecting");
 }
 
+/* Middle-mouse-button drag pans the grid — a different gesture from
+   left-click, so it never competes with range selection above. */
+var panning = false, panX = 0, panY = 0, panL = 0, panT = 0;
+function beginPan(e) {
+  panning = true;
+  panX = e.clientX; panY = e.clientY;
+  panL = wrap.scrollLeft; panT = wrap.scrollTop;
+  wrap.classList.add("panning");
+}
+function endPan() {
+  if (!panning) return;
+  panning = false;
+  if (wrap) wrap.classList.remove("panning");
+}
+
 function attach(gridWrap) {
   wrap = gridWrap;
   tbody = wrap.querySelector("tbody");
   ranges = []; anchor = null; pending = null; hideBar();
-  firstValCol = lastValCol = null;
+  firstSelCol = lastSelCol = null;
   if (!tbody) return;
 
   var firstRow = tbody.rows[0];
   if (firstRow) {
     for (var i = 0; i < firstRow.cells.length; i++) {
-      if (firstRow.cells[i].hasAttribute("data-v")) {
-        if (firstValCol === null) firstValCol = i;
-        lastValCol = i;
+      if (firstRow.cells[i].hasAttribute("data-sel")) {
+        if (firstSelCol === null) firstSelCol = i;
+        lastSelCol = i;
       }
     }
   }
 
   wrap.addEventListener("mousedown", function (e) {
-    /* Row-number cells and the column header have their own click
-       handlers (below) with their own Ctrl/Shift handling — bail out here
-       without clearing, or a Ctrl/Shift click on either would wipe the
-       very selection those modifiers are meant to add to, before its own
-       handler ever runs. */
-    if (e.target.closest && (e.target.closest("td.rownum") || e.target.closest("thead"))) return;
+    if (e.button === 1) { e.preventDefault(); beginPan(e); return; }
+    /* Row-number cells, the sticky title column, and the column header all
+       have their own click handlers (below) with their own Ctrl/Shift
+       handling — bail out here without clearing, or a Ctrl/Shift click on
+       any of them would wipe the very selection those modifiers are meant
+       to add to, before its own handler ever runs. */
+    if (e.target.closest && (e.target.closest("thead") || isRowHandle(e.target.closest("td")))) return;
     var td = e.target.closest ? e.target.closest("td") : null;
     if (!selectable(td)) { if (!e.target.closest(".statusbar")) clear(); return; }
     var p = posOf(td);
@@ -230,7 +255,13 @@ function attach(gridWrap) {
       beginDrag();
     }
   });
+  wrap.addEventListener("auxclick", function (e) { if (e.button === 1) e.preventDefault(); });
   wrap.addEventListener("mousemove", function (e) {
+    if (panning) {
+      wrap.scrollLeft = panL - (e.clientX - panX);
+      wrap.scrollTop = panT - (e.clientY - panY);
+      return;
+    }
     if (pending && downXY) {
       var moved = Math.abs(e.clientX - downXY.x) + Math.abs(e.clientY - downXY.y);
       if (moved > 5) { beginDrag(); }
@@ -263,22 +294,25 @@ function attach(gridWrap) {
     });
   }
 
-  /* row number: click = that row's value cells; Ctrl = add a disjoint
-     row; Shift = extend from the active range's row to this one */
+  /* row-number cell OR the sticky title column (first data column — every
+     tab's row identifier, e.g. Client/Invoice No./Date): click = that
+     row's cells; Ctrl = add a disjoint row; Shift = extend from the active
+     range's row to this one. */
   tbody.addEventListener("click", function (e) {
-    var td = e.target.closest ? e.target.closest("td.rownum") : null;
-    if (!td || firstValCol === null) return;
+    var td = e.target.closest ? e.target.closest("td") : null;
+    if (!isRowHandle(td) || firstSelCol === null) return;
     var p = posOf(td);
     if (!p) return;
-    if (e.shiftKey) extendActive(p.r, lastValCol);
-    else if (e.ctrlKey || e.metaKey) toggleRange(p.r, p.r, firstValCol, lastValCol);
-    else startRange(p.r, p.r, firstValCol, lastValCol);
+    if (e.shiftKey) extendActive(p.r, lastSelCol);
+    else if (e.ctrlKey || e.metaKey) toggleRange(p.r, p.r, firstSelCol, lastSelCol);
+    else startRange(p.r, p.r, firstSelCol, lastSelCol);
     paintAll();
   });
 }
 
-document.addEventListener("mouseup", function () {
+document.addEventListener("mouseup", function (e) {
   pending = null; downXY = null;
+  if (e.button === 1) endPan();
   if (dragging) { dragging = false; if (wrap) wrap.classList.remove("selecting"); }
 });
 document.addEventListener("keydown", function (e) { if (e.key === "Escape") clear(); });

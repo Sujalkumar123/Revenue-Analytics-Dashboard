@@ -111,7 +111,7 @@ export function renderRawDump(opts) {
           opts.cols.map(function (c, ci) {
             var v = r[c.key];
             var disp = c.num ? inr(v) : String(v == null ? "" : v);
-            return '<td class="' + (c.num ? "num " : "") + (ci === 0 ? "sticky-l " : "") + (c.key === "client" ? "cname" : "") + '"' +
+            return '<td data-sel="1" class="' + (c.num ? "num " : "") + (ci === 0 ? "sticky-l " : "") + (c.key === "client" ? "cname" : "") + '"' +
               (c.num ? ' data-v="' + (Math.round((v || 0) * 100) / 100) + '"' : "") +
               ' title="' + esc(disp) + '">' + esc(disp) + "</td>";
           }).join("") + "</tr>";

@@ -126,17 +126,18 @@ export function renderLedger(opts) {
         var val = fieldVal(ds, sheet, ri, c.f);
         var disp = c.f === "amount" ? inr(val) : val;
         var ed = isEdited(sheet, ri, c.f);
-        return '<td class="' + (c.num ? "num " : "") + (ci === 0 ? "sticky-l " : "") +
+        return '<td data-sel="1" class="' + (c.num ? "num " : "") + (ci === 0 ? "sticky-l " : "") +
           (c.f === "client" ? "cname " : "") + (c.edit ? "editable " : "") + (ed ? "edited" : "") + '"' +
+          (c.num ? ' data-v="' + (Math.round((parseFloat(String(val).replace(/[^0-9.\-]/g, "")) || 0) * 100) / 100) + '"' : "") +
           (c.edit ? ' contenteditable="true" data-ri="' + ri + '" data-f="' + c.f +
             '" data-orig="' + esc(disp) + '" title="Click to edit — marked A for admin-edited"' : "") +
           ">" + esc(disp) + "</td>";
       }).join("") +
       mv.map(function (v) {
-        return '<td class="num ' + (Math.abs(v) < 0.5 ? "zero" : v < 0 ? "neg" : "") +
+        return '<td data-sel="1" class="num ' + (Math.abs(v) < 0.5 ? "zero" : v < 0 ? "neg" : "") +
           '" data-v="' + (Math.round(v * 100) / 100) + '">' + inr(v) + "</td>";
       }).join("") +
-      '<td class="num" data-v="' + (Math.round(rowTot * 100) / 100) + '"><b>' + inr(rowTot) + "</b></td></tr>";
+      '<td data-sel="1" class="num" data-v="' + (Math.round(rowTot * 100) / 100) + '"><b>' + inr(rowTot) + "</b></td></tr>";
   }
 
   if (!idx.length) {
