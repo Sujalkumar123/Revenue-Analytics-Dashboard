@@ -56,6 +56,25 @@ export var AUTH = {
     USERS.del(username);
     return true;
   },
+  /* Public self-signup: creates the account with role "pending" — same
+     shape as an admin-created one, just with no access yet. Reuses create()
+     rather than a separate path so the username-taken / password-length
+     checks stay in one place. */
+  requestAccess: function (username, password) {
+    return AUTH.create(username, password, "pending");
+  },
+  /* Admin turns a pending request into a real account by assigning it a
+     role. Doesn't touch the requester's OWN already-open session (if
+     they're signed in right now in another tab, that tab's session object
+     still says "pending" until they sign in again) — a known limitation of
+     a purely client-side, per-browser auth model with no server push. */
+  approve: function (username, role) {
+    var u = USERS.get(username);
+    if (!u || u.role !== "pending") return false;
+    if (role !== "admin" && role !== "read") return false;
+    USERS.set(username, { salt: u.salt, hash: u.hash, role: role, created: u.created });
+    return true;
+  },
   login: function (username, password) {
     var rec = USERS.get(String(username || "").trim());
     if (!rec) return Promise.reject(new Error("Incorrect username or password."));
@@ -72,6 +91,7 @@ export var AUTH = {
   },
   session: function () { return session; },
   isAdmin: function () { return !!session && session.role === "admin"; },
+  isPending: function () { return !!session && session.role === "pending"; },
   signedIn: function () { return !!session; }
 };
 

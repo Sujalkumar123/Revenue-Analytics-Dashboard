@@ -10,7 +10,7 @@ import { runUndo, runRedo } from "./state/history.js";
 import { applyAdds } from "./state/stores.js";
 import { setRender, setStartApp } from "./core/bus.js";
 import { render } from "./controller.js";
-import { renderAuthScreen, renderAccountTab, closeAcctMenu } from "./ui/auth-screens.js";
+import { renderAuthScreen, renderPendingScreen, renderAccountTab, closeAcctMenu } from "./ui/auth-screens.js";
 import { openAddModal } from "./ui/add-client-modal.js";
 import { toast } from "./ui/toast.js";
 
@@ -130,6 +130,11 @@ function boot() {
   if (!AUTH.signedIn()) {
     document.getElementById("view").innerHTML = "";
     renderAuthScreen();
+    return;
+  }
+  if (AUTH.isPending()) {
+    document.getElementById("view").innerHTML = "";
+    renderPendingScreen();
     return;
   }
   startApp();

@@ -401,6 +401,11 @@ td.sticky-l{cursor:pointer}
   border:1px solid color-mix(in srgb,var(--bad) 28%,transparent)}
 .auth-msg.info{color:var(--ink-2);background:var(--surface-2);border:1px solid var(--border)}
 .auth-foot{font-size:10.5px;color:var(--ink-3);text-align:center;line-height:1.5;padding:0 24px 18px}
+/* sign-in <-> request-access toggle, under the primary button — a plain
+   text link, not another button, so it doesn't compete with Sign in */
+.auth-switch{background:none;border:none;color:var(--accent);font-size:12px;font-weight:600;
+  cursor:pointer;font-family:inherit;padding:2px;text-align:center;width:100%}
+.auth-switch:hover{text-decoration:underline}
 
 .user-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border-soft)}
 .user-row:last-child{border-bottom:none}
@@ -408,6 +413,11 @@ td.sticky-l{cursor:pointer}
 .user-row .rl{font-size:10px;text-transform:uppercase;letter-spacing:.06em;font-weight:700;
   padding:2px 8px;border-radius:99px;background:var(--surface-3);color:var(--ink-2)}
 .user-row .rl.admin{background:var(--accent-soft);color:var(--accent)}
+/* a pending signup request — warm tint sets it apart from the active-user
+   rows below it, matching the "needs attention" gold used elsewhere */
+.user-row.pending-row{background:var(--gold-soft);margin:0 -12px;padding:9px 12px;border-radius:9px;border-bottom:none}
+.user-row.pending-row .approve-role{font-size:12px;padding:5px 8px}
+.user-row.pending-row .approve-btn{padding:5px 11px;font-size:12px}
 .user-row .spacer{margin-left:auto}
 .user-row button{background:none;border:1px solid var(--border);color:var(--ink-3);border-radius:7px;
   padding:4px 9px;font-size:11px;cursor:pointer;font-family:inherit}
