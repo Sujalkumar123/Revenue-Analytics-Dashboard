@@ -6,10 +6,51 @@
 
 import { store } from "../core/store.js";
 
-var USERS = store("ra_users_v1");        // username -> {salt, hash, role, created}
+var UKEY = "ra_users_v1";
+var USERS = store(UKEY);                 // username -> {salt, hash, role, created}
 var SKEY = "ra_session_v1";
 var session = null;
 try { session = JSON.parse(sessionStorage.getItem(SKEY) || "null"); } catch (e) { session = null; }
+
+/* A stored session is just a claim ("I am X, role Y") — nothing re-checks it
+   against the actual user list once it's set, so an admin removing someone
+   (or changing their role) had no effect on that person's own already-open
+   tab: they'd kept seeing data until they happened to sign out themselves.
+   Runs once here at load (catches "removed, then the removed person reloads
+   their tab") — USERS was just constructed from a fresh localStorage read
+   above, so this pass is trustworthy. */
+function dropStaleSession() {
+  if (!session) return;
+  var rec = USERS.get(session.username);
+  if (!rec || rec.role !== session.role) {
+    session = null;
+    try { sessionStorage.removeItem(SKEY); } catch (e) {}
+  }
+}
+dropStaleSession();
+/* Catches the OTHER case — removed (or promoted/demoted) while their tab is
+   already open, no reload. "storage" fires in every OTHER same-origin tab
+   the instant localStorage changes in one of them, which is exactly the
+   removed person's tab reacting to the admin's tab making the change.
+   Deliberately reads e.newValue directly rather than going through USERS:
+   USERS was built from a ONE-TIME localStorage read back when this tab
+   first loaded, and nothing in this tab's own activity would ever cause it
+   to notice a DIFFERENT tab rewriting that key underneath it — asking it
+   here would just re-confirm the same stale answer that let this bug happen
+   in the first place. */
+if (typeof window !== "undefined") {
+  window.addEventListener("storage", function (e) {
+    if (e.key !== UKEY || !session) return;
+    var fresh = {};
+    try { fresh = JSON.parse(e.newValue || "{}"); } catch (err) {}
+    var rec = fresh[session.username];
+    if (!rec || rec.role !== session.role) {
+      session = null;
+      try { sessionStorage.removeItem(SKEY); } catch (err) {}
+      location.reload();   // was signed in, now isn't — land back on the sign-in screen
+    }
+  });
+}
 
 function rand(n) {
   var a = new Uint8Array(n || 16);
@@ -64,10 +105,12 @@ export var AUTH = {
     return AUTH.create(username, password, "pending");
   },
   /* Admin turns a pending request into a real account by assigning it a
-     role. Doesn't touch the requester's OWN already-open session (if
-     they're signed in right now in another tab, that tab's session object
-     still says "pending" until they sign in again) — a known limitation of
-     a purely client-side, per-browser auth model with no server push. */
+     role. If the requester already has their own "Access pending" tab open
+     in this SAME browser, dropStaleSession()'s storage listener reloads it
+     the moment this write lands, so they land straight on the dashboard —
+     no server push involved, just localStorage changing under a tab that's
+     watching for it. A different browser/device entirely still needs a
+     fresh sign-in, since nothing here is shared beyond one browser. */
   approve: function (username, role) {
     var u = USERS.get(username);
     if (!u || u.role !== "pending") return false;
