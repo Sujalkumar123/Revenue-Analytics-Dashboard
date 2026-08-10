@@ -97,7 +97,8 @@ export function renderLedger(opts) {
       (state.flagOnly ? "Showing needs attention (" : "Needs attention (") + flagged + ")</button>" : "") +
     (edits && !locked ? '<button class="icon-btn" id="clrEdits">Reset ' + edits + " edit(s)</button>" : "") +
     (activeFilterKeys.length ? '<button class="icon-btn" id="clrFilters">Clear ' + activeFilterKeys.length + " filter(s)</button>" : "") +
-    (newItems ? '<button class="chip-tool" id="itemMapBtn">⚠ New items (' + newItems + ") — assign a product</button>" : "") +
+    (!locked ? '<button class="chip-tool" id="itemMapBtn">🔤 Item → Product mapping' +
+      (newItems ? " (" + newItems + " new)" : "") + "</button>" : "") +
     toolbarControlsHTML({ noExport: true }) + "</div>";
 
   var cols = locked
