@@ -1,5 +1,5 @@
 /* Item name -> Product lookup, mirroring backend/zoho/derive_consol.py's
-   ITEM_PRODUCT_MAP (same 70 entries, majority-vote resolved from ~2,500
+   ITEM_PRODUCT_MAP (same entries, majority-vote resolved from thousands of
    real ground-truth rows the repo owner supplied directly from actual
    classified data). A blank product is a real, verified answer — several
    item types (mostly one-time "-O" setup/support charges) genuinely carry
@@ -50,7 +50,15 @@ export var DEFAULT_ITEM_PRODUCT_MAP = {
   "SFA GT - Subscription Charges": "GT subscription", "SFA GT - Subscription Charges-M": "GT subscription",
   "SFA GT - Support Charges-M": "Other modules", "SFA GT - Training Charges-O": "",
   "SFA MT - Other Charges-M": "MT subscription", "SFA MT - ProRata Adjustments-M": "MT subscription",
-  "SFA MT - Subscription Charges-M": "MT subscription", "TA / DA Module-M": "Other modules"
+  "SFA MT - Subscription Charges-M": "MT subscription", "TA / DA Module-M": "Other modules",
+
+  "Beat-o-Meter-M - ProRata Adjustment": "Other modules", "Beat-o-Meter-ProRata Adjustment-M": "Other modules",
+  "One Time Setup Cost": "", "One Time development": "", "DMS ARS-O": "", "DMS - Development Charges-O": "",
+  "CoPilot-O": "", "AI Module Computation-M": "Other modules", "Other Charges-O": "",
+  "FA ONE - Setup Charges-O": "", "FA ONE - Project Management Cost-O": "", "FA ONE - Hypercare Charges-O": "",
+  "FA ONE - Training Charges-O": "", "FA ONE - Support Charges-O": "", "Red Live App - Setup Charges-O": "",
+  "SFA MT - Development Charges-O": "", "SFA MT - Setup Charges-O": "", "SFA MT - Training Charges-O": "Other modules",
+  "Digital ASM Set-up Cost-O": ""
 };
 
 var OVERRIDES = store("ra_item_product_overrides_v1");
@@ -76,4 +84,19 @@ export function overrideCount() {
   var n = 0, all = OVERRIDES.all();
   for (var k in all) n++;
   return n;
+}
+
+/* Product/module names offered as suggestions in the mapping tool — the
+   original five plus whatever an admin has registered since (a brand new
+   product line doesn't need a code change to become assignable). */
+var BASE_KNOWN_PRODUCTS = ["GT subscription", "DMS subscription", "MT subscription", "Flo subscription", "Other modules"];
+var CUSTOM_PRODUCTS = store("ra_custom_products_v1");   // name -> true
+export function listKnownProducts() {
+  var extra = Object.keys(CUSTOM_PRODUCTS.all());
+  return Array.from(new Set(BASE_KNOWN_PRODUCTS.concat(extra))).sort();
+}
+export function addKnownProduct(name) {
+  var n = (name || "").trim();
+  if (!n) return;
+  CUSTOM_PRODUCTS.set(n, true);
 }
