@@ -5,10 +5,11 @@
 
 import { fyMonths } from "../core/dates.js";
 import { inr, inrShort, esc } from "../core/format.js";
-import { aggregate, netAggregate } from "../data/revenue.js";
+import { aggregate, netAggregate, computeProvisional } from "../data/revenue.js";
 import { state, S, curFY } from "../state/app-state.js";
 import { canEdit } from "../state/auth.js";
 import { MXO, mxKey, mxCount } from "../state/stores.js";
+import { getProvStatus, setProvStatus, clearProvStatus } from "../state/recurring-status.js";
 import { HISTORY } from "../state/history.js";
 import { parseNum } from "../core/format.js";
 import { kpiCard, toolbarControlsHTML, wireSearchSort, MONTH_W } from "./toolbar.js";
@@ -37,10 +38,25 @@ export function renderMatrix(opts) {
      it's computed independently rather than derived from `gross`/`credit`. */
   var net = opts.netable ? netAggregate(S.consol, S.credit, months, opts.filter) : new Map();
 
+  /* Provisional (projected) revenue for recurring clients with no invoice
+     yet in a current/future month — see computeProvisional()'s own comment.
+     Computed once here (across full history, keyed by month label) so it
+     can be spliced into whichever months are on screen. */
+  var overlay = opts.projectable ? computeProvisional(S.consol, opts.filter) : new Map();
+
   var names = new Set();
   gross.forEach(function (_, k) { names.add(k); });
   credit.forEach(function (_, k) { names.add(k); });
   net.forEach(function (_, k) { names.add(k); });
+  /* A client can be entirely provisional for the FY on screen (no real
+     invoice at all this year) and so absent from the three maps above —
+     pull those in too, but only if one of their projected months actually
+     falls inside the months currently shown. */
+  overlay.forEach(function (perMonth, client) {
+    perMonth.forEach(function (_, monthLabel) {
+      if (months.some(function (m) { return m.label === monthLabel; })) names.add(client);
+    });
+  });
 
   var metric = opts.netable ? state.metric : "gross";
   var editable = !!opts.editable && canEdit();
@@ -49,6 +65,26 @@ export function renderMatrix(opts) {
     var g = gross.get(n) || new Array(months.length).fill(0);
     var c = credit.get(n) || new Array(months.length).fill(0);
     var nt = net.get(n) || new Array(months.length).fill(0);
+    /* prov[i]: undefined (no projection here), "pending", "confirmed" or
+       "churned". Only substituted where the real gross figure is zero — a
+       month that already has a real invoice is never overridden by a
+       projection, regardless of status. Confirming a cell doesn't change
+       its number (per design) — it just re-labels "pending" -> "confirmed";
+       churning zeroes it back out. */
+    var prov = [];
+    var clientOverlay = overlay.get(n);
+    if (clientOverlay) {
+      for (var pi = 0; pi < months.length; pi++) {
+        if (Math.abs(g[pi]) >= 0.5) continue;
+        var projAmt = clientOverlay.get(months[pi].label);
+        if (projAmt === undefined) continue;
+        var st = getProvStatus(n, months[pi].label) || "pending";
+        prov[pi] = st;
+        if (st === "churned") continue;   // stays zero — excluded from revenue
+        g[pi] = projAmt;
+        nt[pi] = projAmt;
+      }
+    }
     var ov = [];
     var vals = months.map(function (m, i) {
       var v = metric === "gross" ? g[i] : metric === "credit" ? c[i] : nt[i];
@@ -61,8 +97,8 @@ export function renderMatrix(opts) {
     /* totals come from the overridden values, so a typed figure flows into
        the month total, the FY total and the KPI cards */
     var tot = vals.reduce(function (a, b) { return a + b; }, 0);
-    if (Math.abs(tot) < 0.5 && !vals.some(function (v) { return Math.abs(v) >= 0.5; }) && !ov.length) return;
-    rows.push({ name: n, vals: vals, total: tot, ov: ov });
+    if (Math.abs(tot) < 0.5 && !vals.some(function (v) { return Math.abs(v) >= 0.5; }) && !ov.length && !prov.length) return;
+    rows.push({ name: n, vals: vals, total: tot, ov: ov, prov: prov });
   });
 
   var term = state.search.trim().toLowerCase();
@@ -146,19 +182,70 @@ export function renderMatrix(opts) {
           '<td data-sel="1" class="sticky-l cname" title="' + esc(r.name) + '">' + esc(r.name) + "</td>" +
           r.vals.map(function (v, mi) {
             var disp = inr(v);
+            /* Provisional status only means anything for the metric it was
+               computed against (gross/net) — a plain Credit notes view has
+               no projected figures, so never badge those cells. */
+            var provSt = metric !== "credit" ? r.prov[mi] : undefined;
+            /* Pending/churned cells carry action buttons inside the cell —
+               those buttons' own text would pollute td.textContent (which
+               commitMx()/contentEditable rely on being just the figure), so
+               those two states are deliberately NOT double-click-editable;
+               use Confirm/Reject/Undo instead. A confirmed cell has no
+               in-cell text beyond the figure (just a border treatment), so
+               it stays a normal editable/overridable cell like any other. */
+            var provInteractive = provSt === "pending" || provSt === "churned";
+            var cellEditable = editable && !provInteractive;
+            var provClass = provSt === "churned" ? "prov-churned " : provSt === "confirmed" ? "prov-confirmed " : provSt === "pending" ? "prov-pending " : "";
+            var provBadge = "";
+            if (provSt === "pending") {
+              provBadge = editable
+                ? '<span class="prov-actions"><button type="button" class="prov-btn prov-confirm" title="Confirm as actual">✓</button><button type="button" class="prov-btn prov-reject" title="Mark as churn">✕</button></span>'
+                : '<span class="prov-badge" title="Projected — no invoice yet">Projected</span>';
+            } else if (provSt === "churned") {
+              provBadge = editable
+                ? '<span class="prov-actions"><button type="button" class="prov-btn prov-undo" title="Undo — revert to pending">↺ Undo</button></span>'
+                : '<span class="prov-badge prov-badge-churned" title="Marked churned — excluded from revenue">Churned</span>';
+            }
             return '<td data-sel="1" class="num ' + (Math.abs(v) < 0.5 ? "zero " : v < 0 ? "neg " : "") +
-              (editable ? "editable " : "") + (r.ov[mi] ? "edited" : "") +
+              (cellEditable ? "editable " : "") + (r.ov[mi] ? "edited " : "") + provClass +
               '" data-v="' + (Math.round(v * 100) / 100) + '"' +
-              (editable ? ' data-mx="1" data-client="' + esc(r.name) +
+              (cellEditable ? ' data-mx="1" data-client="' + esc(r.name) +
                 '" data-month="' + esc(months[mi].label) + '" data-orig="' + esc(disp) +
                 '" title="Double-click to type a figure and override this month for this client — marked A for admin-edited"' : "") +
-              ">" + disp + "</td>";
+              (provInteractive ? ' data-prov="1" data-prov-status="' + provSt + '" data-prov-client="' + esc(r.name) + '" data-prov-month="' + esc(months[mi].label) + '"' : "") +
+              ">" + disp + provBadge + "</td>";
           }).join("") +
           '<td data-sel="1" class="num" data-v="' + (Math.round(r.total * 100) / 100) + '"><b>' + inr(r.total) + "</b></td></tr>";
       }
       return out;
     });
     SEL.attach(view.querySelector("#gw"));
+
+    var tbAll = view.querySelector("#tb");
+    /* Confirm/Reject/Undo buttons live inside a data-sel="1" cell, so their
+       own mousedown would otherwise be picked up by SEL's drag-to-select
+       first — stop it reaching SEL before it starts. */
+    tbAll.addEventListener("mousedown", function (e) {
+      if (e.target && e.target.closest && e.target.closest(".prov-btn")) e.stopPropagation();
+    });
+    tbAll.addEventListener("click", function (e) {
+      var btn = e.target && e.target.closest ? e.target.closest(".prov-btn") : null;
+      if (!btn) return;
+      e.stopPropagation();
+      var td = btn.closest("td[data-prov]");
+      if (!td) return;
+      var client = td.getAttribute("data-prov-client"), monthLabel = td.getAttribute("data-prov-month");
+      var prevStatus = getProvStatus(client, monthLabel);
+      var action = btn.classList.contains("prov-confirm") ? "confirmed"
+        : btn.classList.contains("prov-reject") ? "churned"
+          : null;   // undo -> back to pending (no stored status)
+      HISTORY.perform({
+        label: (action === "confirmed" ? "confirm " : action === "churned" ? "mark churn for " : "undo churn for ") + monthLabel + " · " + client,
+        apply: function () { if (action) setProvStatus(client, monthLabel, action); else clearProvStatus(client, monthLabel); },
+        revert: function () { if (prevStatus) setProvStatus(client, monthLabel, prevStatus); else clearProvStatus(client, monthLabel); }
+      });
+      render();
+    });
 
     if (editable) {
       var tbEl = view.querySelector("#tb");

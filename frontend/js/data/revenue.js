@@ -5,6 +5,7 @@
 "use strict";
 
 import { effAmount, effPeriod, effRec, effProduct, fieldVal } from "./fields.js";
+import { fyMonths, DATA_END, EPOCH, DAY } from "../core/dates.js";
 
 export function monthlyOf(ds, sheet, ri, months) {
   var out = new Array(months.length).fill(0);
@@ -98,6 +99,62 @@ export function netAggregate(consolDs, creditDs, months, filterFn) {
   }
 
   return map;
+}
+
+/* A recurring client's revenue is predictable — same user count roughly
+   bills the same amount every month — so a month with no invoice yet
+   isn't necessarily "zero revenue," it's usually just "not billed/synced
+   yet." For every recurring client, projects their last actual month's
+   user count × per-user rate forward into every month after that up
+   through DATA_END (the latest date this snapshot actually covers) that
+   still has no real invoice. Computed across the FULL history regardless
+   of which FY is on screen, keyed by month label, so switching FY tabs
+   doesn't recompute a different answer.
+   Deliberately per-CLIENT, not per-item/product: Recurring Revenue itself
+   is a client×month grid, not broken down by product, so a blended
+   per-client number is what actually gets displayed and edited. */
+export function computeProvisional(consolDs, filterFn) {
+  var allMonths = fyMonths({ y: null });
+  var todayDnum = Math.round((DATA_END - EPOCH) / DAY);
+  var gross = aggregate(consolDs, "consol", allMonths, filterFn);
+
+  var usersByClient = new Map();
+  for (var i = 0; i < consolDs.rows.length; i++) {
+    if (filterFn && !filterFn(consolDs, "consol", i)) continue;
+    var client = fieldVal(consolDs, "consol", i, "client");
+    var p = effPeriod(consolDs, "consol", i);
+    if (!p) continue;
+    var arr = usersByClient.get(client);
+    if (!arr) { arr = new Array(allMonths.length).fill(0); usersByClient.set(client, arr); }
+    var u = parseFloat(fieldVal(consolDs, "consol", i, "users")) || 0;
+    for (var m = 0; m < allMonths.length; m++) {
+      if (allMonths[m].e < p.s || allMonths[m].s > p.e) continue;
+      arr[m] += u;
+    }
+  }
+
+  var overlay = new Map();   // client -> Map(monthLabel -> projected amount)
+  gross.forEach(function (arr, client) {
+    var lastIdx = -1;
+    for (var i = 0; i < allMonths.length; i++) {
+      if (allMonths[i].s > todayDnum) break;
+      if (arr[i] > 0.5) lastIdx = i;
+    }
+    if (lastIdx === -1) return;   // this client has no actual recurring history at all
+    var uArr = usersByClient.get(client);
+    var lastUsers = uArr ? uArr[lastIdx] : 0;
+    var lastAmount = arr[lastIdx];
+    var rate = lastUsers > 0 ? lastAmount / lastUsers : null;
+    var perMonth = new Map();
+    for (var j = lastIdx + 1; j < allMonths.length; j++) {
+      var mo = allMonths[j];
+      if (mo.s > todayDnum) break;
+      if (arr[j] > 0.5) continue;   // real data already showed up for this month — not a gap
+      perMonth.set(mo.label, rate !== null ? rate * lastUsers : lastAmount);
+    }
+    if (perMonth.size) overlay.set(client, perMonth);
+  });
+  return overlay;
 }
 
 export var onlyRecurring = function (ds, sheet, i) { return effRec(ds, sheet, i) === 1; };

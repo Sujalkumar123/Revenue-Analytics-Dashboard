@@ -305,6 +305,36 @@ td.edited::after{
 }
 .grid-wrap.locked td{cursor:default}
 
+/* Recurring Revenue provisional cells — a projected figure for a recurring
+   client with no invoice yet this month. Pending = amber (still just a
+   projection, but already counted in revenue); confirmed = a quiet green
+   border, no in-cell text (see matrix-view.js's comment on why); churned =
+   red/muted, value zeroed back out. Position:relative so the actions
+   overlay can sit inside the cell without disturbing its layout. */
+td.prov-pending{position:relative;background:var(--gold-soft)!important;box-shadow:inset 0 0 0 1px var(--gold)}
+td.prov-confirmed{box-shadow:inset 0 0 0 1px var(--good)}
+td.prov-churned{position:relative;background:var(--surface-2)!important;color:var(--ink-3)!important;box-shadow:inset 0 0 0 1px var(--bad)}
+.prov-badge{
+  display:inline-block;margin-left:6px;font-size:9px;font-weight:750;text-transform:uppercase;
+  letter-spacing:.04em;padding:1px 5px;border-radius:99px;vertical-align:middle;
+  background:var(--gold-soft);color:var(--gold)
+}
+.prov-badge-confirmed{background:var(--new-soft);color:var(--good)}
+.prov-badge-churned{background:rgba(200,64,61,.12);color:var(--bad)}
+.prov-actions{
+  position:absolute;top:2px;right:3px;display:flex;gap:2px;z-index:2;
+  opacity:0;transition:opacity .12s
+}
+tr:hover .prov-actions,td.prov-pending:focus-within .prov-actions,td.prov-churned:focus-within .prov-actions{opacity:1}
+.prov-btn{
+  flex:none;width:16px;height:16px;line-height:1;font-size:9px;font-weight:800;font-family:inherit;
+  border:none;border-radius:4px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;
+  box-shadow:0 1px 2px rgba(0,0,0,.25)
+}
+.prov-confirm{background:var(--good);color:#fff}
+.prov-reject{background:var(--bad);color:#fff}
+.prov-undo{width:auto;padding:0 6px;background:var(--panel);color:var(--ink-2);border:1px solid var(--border-strong)}
+
 td.sel{background:var(--sel)!important}
 /* per-range borders are set as an inline box-shadow in JS (combining however
    many of the 4 edges apply to a given cell) — a set of single-edge classes

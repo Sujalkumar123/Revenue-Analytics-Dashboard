@@ -21,7 +21,7 @@ export function render(keepFocus) {
   SEL.clear();
 
   if (state.tab === "recurr") {
-    renderMatrix({ title: "Recurring Revenue by Client", filter: onlyRecurring, netable: true, editable: true });
+    renderMatrix({ title: "Recurring Revenue by Client", filter: onlyRecurring, netable: true, editable: true, projectable: true });
   } else if (state.tab === "onetime") {
     renderMatrix({ title: "One-time Charges (OTC) by Client", filter: onlyOneTime, netable: false });
   } else if (state.tab === "consol") {
