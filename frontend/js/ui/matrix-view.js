@@ -5,7 +5,7 @@
 
 import { fyMonths } from "../core/dates.js";
 import { inr, inrShort, esc } from "../core/format.js";
-import { aggregate } from "../data/revenue.js";
+import { aggregate, netAggregate } from "../data/revenue.js";
 import { state, S, curFY } from "../state/app-state.js";
 import { canEdit } from "../state/auth.js";
 import { MXO, mxKey, mxCount } from "../state/stores.js";
@@ -32,10 +32,15 @@ export function renderMatrix(opts) {
   var months = fyMonths(curFY());
   var gross = aggregate(S.consol, "consol", months, opts.filter);
   var credit = opts.netable ? aggregate(S.credit, "credit", months, opts.filter) : new Map();
+  /* Net isn't just gross-minus-credit off the two maps above — see
+     netAggregate()'s own comment — it's netted per invoice line first, so
+     it's computed independently rather than derived from `gross`/`credit`. */
+  var net = opts.netable ? netAggregate(S.consol, S.credit, months, opts.filter) : new Map();
 
   var names = new Set();
   gross.forEach(function (_, k) { names.add(k); });
   credit.forEach(function (_, k) { names.add(k); });
+  net.forEach(function (_, k) { names.add(k); });
 
   var metric = opts.netable ? state.metric : "gross";
   var editable = !!opts.editable && canEdit();
@@ -43,9 +48,10 @@ export function renderMatrix(opts) {
   names.forEach(function (n) {
     var g = gross.get(n) || new Array(months.length).fill(0);
     var c = credit.get(n) || new Array(months.length).fill(0);
+    var nt = net.get(n) || new Array(months.length).fill(0);
     var ov = [];
     var vals = months.map(function (m, i) {
-      var v = metric === "gross" ? g[i] : metric === "credit" ? c[i] : g[i] - c[i];
+      var v = metric === "gross" ? g[i] : metric === "credit" ? c[i] : nt[i];
       if (editable) {
         var o = MXO.get(mxKey(state.tab, metric, state.fy, m.label, n));
         if (o !== undefined) { var p = parseNum(o); if (p !== null) { ov[i] = true; v = p; } }
