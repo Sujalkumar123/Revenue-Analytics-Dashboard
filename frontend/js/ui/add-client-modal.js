@@ -24,8 +24,12 @@ function todayISO() {
 
 export function openAddModal() {
   var fy = curFY();
-  var startISO = fy.y + "-04-01";
-  var endISO = (fy.y + 1) + "-03-31";
+  /* "All years" (fy.y === null) has no single year to anchor a new client's
+     default dates to -- fall back to the current real-world FY so the form
+     still starts somewhere sane instead of producing "null-04-01". */
+  var anchorYear = fy.y === null ? new Date().getFullYear() : fy.y;
+  var startISO = anchorYear + "-04-01";
+  var endISO = (anchorYear + 1) + "-03-31";
   var wrap = document.createElement("div");
   wrap.className = "modal-backdrop";
   wrap.id = "modal";

@@ -43,14 +43,23 @@ export const FYS = [
   { id: "2023-24", label: "FY 2023–24", y: 2023 },
   { id: "2024-25", label: "FY 2024–25", y: 2024 },
   { id: "2025-26", label: "FY 2025–26", y: 2025 },
-  { id: "2026-27", label: "FY 2026–27 (part)", y: 2026 }
+  { id: "2026-27", label: "FY 2026–27 (part)", y: 2026 },
+  /* y:null is the "every year at once" case — fyMonths() below starts it at
+     the earliest FY instead of a single year. Exists so a column filter
+     (client, status, whatever) can be checked against the whole dataset at
+     once instead of having to flip through one FY at a time to find every
+     match. Kept last in the list so it doesn't shift any of the index-based
+     lookups elsewhere that assume the normal FYs stay in this order. */
+  { id: "all", label: "All years", y: null }
 ];
 export const DATA_END = Date.UTC(2026, 5, 30);
+var EARLIEST_FY_YEAR = FYS[0].y;
 
 export function fyMonths(fy) {
-  var out = [], y = fy.y;
-  for (var i = 0; i < 12; i++) {
-    var mo = (3 + i) % 12, yy = y + (3 + i >= 12 ? 1 : 0);
+  var out = [], y = fy.y === null ? EARLIEST_FY_YEAR : fy.y;
+  var maxMonths = fy.y === null ? 600 : 12;   // 600 = 50 years' worth; DATA_END always cuts it off well before that
+  for (var i = 0; i < maxMonths; i++) {
+    var mo = (3 + i) % 12, yy = y + Math.floor((3 + i) / 12);
     var start = Date.UTC(yy, mo, 1);
     if (start > DATA_END) break;
     out.push({
