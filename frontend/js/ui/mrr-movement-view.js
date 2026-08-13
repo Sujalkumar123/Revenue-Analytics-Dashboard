@@ -10,7 +10,7 @@
 
 import { fyMonths } from "../core/dates.js";
 import { inr, inrShort, esc } from "../core/format.js";
-import { aggregate, onlyRecurring, computeProvisional } from "../data/revenue.js";
+import { aggregate, aggregateUsers, onlyRecurring, computeProvisional, recurringProduct } from "../data/revenue.js";
 import { state, S } from "../state/app-state.js";
 import { canEdit } from "../state/auth.js";
 import { getTier, setTier, TIERS } from "../state/client-tier.js";
@@ -30,6 +30,13 @@ function classify(a, b) {
   return "flat";
 }
 var MOVE_LABEL = { new: "New", growth: "Growth", decline: "Decline", churned: "Churned", flat: "Flat" };
+var PRODUCTS = [
+  { key: "gt", label: "SFA GT", product: "GT subscription" },
+  { key: "dms", label: "DMS", product: "DMS subscription" },
+  { key: "mt", label: "SFA MT", product: "MT subscription" },
+  { key: "flo", label: "Flo", product: "Flo subscription" },
+  { key: "other", label: "Other modules", product: "Other modules" }
+];
 
 export function renderMrrMovement() {
   var months = fyMonths({ y: null });
@@ -89,6 +96,55 @@ export function renderMrrMovement() {
 
   rows.sort(function (x, y) { return Math.abs(y.delta) - Math.abs(x.delta); });
 
+  /* Second section: a 3-month trend of each client's total (still
+     provisional-aware, via resolved()) plus a per-product snapshot for
+     the latest month only. Product figures are real invoiced amounts only
+     — computeProvisional() blends a client's projection at the whole-
+     client level, not per product, so there's nothing to project a single
+     product column from; a client currently running on a projected total
+     will show 0s across every product here even though its trend/bridge
+     total above is nonzero. Reuses the exact same (already filtered)
+     client list as the bridge above, so the two sections never disagree
+     about who's in view. */
+  var trendIdx = [Math.max(0, idxB - 2), Math.max(0, idxB - 1), idxB];
+  var trendMonths = trendIdx.map(function (i) { return months[i]; });
+  var prodMaps = PRODUCTS.map(function (p) {
+    return { gross: aggregate(S.consol, "consol", months, recurringProduct(p.product)), users: aggregateUsers(S.consol, "consol", months, recurringProduct(p.product)) };
+  });
+  rows.forEach(function (r) {
+    var garr = gross.get(r.name);
+    r.trend = trendIdx.map(function (idx) { return garr ? resolved(r.name, garr, idx) : 0; });
+    r.prod = prodMaps.map(function (pm) {
+      var g = pm.gross.get(r.name), u = pm.users.get(r.name);
+      return { revenue: g ? (g[idxB] || 0) : 0, users: u ? (u[idxB] || 0) : 0 };
+    });
+  });
+
+  /* Third section: the Summary sheet's own view — MRR, Users and ARPU
+     trended by Tier over a trailing 12 months (ending at Month B), ARPU
+     being the formula the sheet used it for: MRR / Users. Independent of
+     the bridge's search/movement filter above (a segment rollup shouldn't
+     change because the client list happens to be filtered to "Churned"),
+     but built from the same resolved()/provisional-aware totals. */
+  var tierIdx = []; for (var ti = Math.max(0, idxB - 11); ti <= idxB; ti++) tierIdx.push(ti);
+  var tierMonths = tierIdx.map(function (i) { return months[i]; });
+  var usersAll = aggregateUsers(S.consol, "consol", months, onlyRecurring);
+  var TIER_ROWS = TIERS.concat(["Unclassified"]);
+  var tierData = {};
+  TIER_ROWS.forEach(function (t) { tierData[t] = { mrr: new Array(tierIdx.length).fill(0), users: new Array(tierIdx.length).fill(0) }; });
+  gross.forEach(function (arr, client) {
+    var t = getTier(client) || "Unclassified";
+    var uarr = usersAll.get(client);
+    tierIdx.forEach(function (globalIdx, li) {
+      tierData[t].mrr[li] += resolved(client, arr, globalIdx);
+      tierData[t].users[li] += uarr ? (uarr[globalIdx] || 0) : 0;
+    });
+  });
+  var tierARPU = {};
+  TIER_ROWS.forEach(function (t) {
+    tierARPU[t] = tierData[t].mrr.map(function (m, li) { var u = tierData[t].users[li]; return u > 0.5 ? m / u : 0; });
+  });
+
   var newMRR = 0, growthMRR = 0, declineMRR = 0, churnedMRR = 0;
   rows.forEach(function (r) {
     if (r.move === "new") newMRR += r.b;
@@ -142,6 +198,50 @@ export function renderMrrMovement() {
   }
   html += '</tbody></table><div class="sentinel" aria-hidden="true"></div></div>' +
     (rows.length ? loadMoreHTML(rows.length, true) : "") + "</div>";
+
+  /* Section 2: per-product User count + Revenue snapshot, plus a 3-month
+     total-MRR trend leading up to it. */
+  html += '<div class="card"><div class="toolbar"><b style="font-size:13px">Product breakdown</b>' +
+    '<span style="color:var(--ink-3);font-size:12px">Users + revenue for ' + esc(monthB.label) +
+    ' · trend through ' + esc(trendMonths[0].label) + ' → ' + esc(trendMonths[2].label) + '</span></div>';
+  html += '<div class="grid-wrap" id="gw2"><table class="grid"><thead><tr class="hdr-row">' +
+    '<th class="rownum" style="width:38px"></th>' +
+    '<th class="lbl sticky-l" style="width:270px">Client</th>' +
+    trendMonths.map(function (m) { return '<th class="num" style="width:110px">' + esc(m.label) + "</th>"; }).join("") +
+    PRODUCTS.map(function (p) {
+      return '<th class="num" style="width:80px">' + esc(p.label) + ' Users</th>' +
+        '<th class="num" style="width:110px">' + esc(p.label) + ' MRR</th>';
+    }).join("") +
+    "</tr></thead><tbody id=\"tb2\">";
+  if (!rows.length) {
+    html += '<tr><td colspan="' + (2 + trendMonths.length + PRODUCTS.length * 2) + '" style="padding:26px;text-align:center;color:var(--ink-3)">No matching clients.</td></tr>';
+  }
+  html += '</tbody></table><div class="sentinel" aria-hidden="true"></div></div>' +
+    (rows.length ? loadMoreHTML(rows.length, false) : "") + "</div>";
+
+  /* Section 3: MRR / Users / ARPU by Tier, trailing 12 months. */
+  html += '<div class="card"><div class="toolbar"><b style="font-size:13px">Tier summary</b>' +
+    '<div class="seg" role="group" aria-label="Tier metric">' +
+    '<button data-tiermetric="mrr" aria-pressed="' + (state.mrrTierMetric === "mrr") + '">MRR</button>' +
+    '<button data-tiermetric="users" aria-pressed="' + (state.mrrTierMetric === "users") + '">Users</button>' +
+    '<button data-tiermetric="arpu" aria-pressed="' + (state.mrrTierMetric === "arpu") + '">ARPU</button></div></div>';
+  html += '<div class="grid-wrap"><table class="grid"><thead><tr class="hdr-row">' +
+    '<th class="lbl sticky-l" style="width:150px">Tier</th>' +
+    tierMonths.map(function (m) { return '<th class="num" style="width:110px">' + esc(m.label) + "</th>"; }).join("") +
+    (state.mrrTierMetric === "mrr" ? '<th class="num" style="width:130px">Total</th>' : "") +
+    "</tr></thead><tbody>";
+  TIER_ROWS.forEach(function (t) {
+    var series = state.mrrTierMetric === "mrr" ? tierData[t].mrr : state.mrrTierMetric === "users" ? tierData[t].users : tierARPU[t];
+    var tot = tierData[t].mrr.reduce(function (a, b) { return a + b; }, 0);
+    html += '<tr><td class="lbl sticky-l" title="' + esc(t) + '">' + esc(t) + "</td>" +
+      series.map(function (v) {
+        return '<td class="num ' + (Math.abs(v) < 0.5 ? "zero" : "") + '">' +
+          (state.mrrTierMetric === "users" ? Math.round(v).toLocaleString("en-IN") : inr(v)) + "</td>";
+      }).join("") +
+      (state.mrrTierMetric === "mrr" ? '<td class="num"><b>' + inr(tot) + "</b></td>" : "") +
+      "</tr>";
+  });
+  html += "</tbody></table></div></div>";
 
   var view = document.getElementById("view");
   view.innerHTML = html;
@@ -214,6 +314,22 @@ export function renderMrrMovement() {
       });
       attachDblClickEdit(tbEl, "td.remark-cell");
     }
+
+    attachInfinite(view.querySelector("#gw2"), view.querySelector("#tb2"), rows.length, function (from, to) {
+      var out = "";
+      for (var i = from; i < to; i++) {
+        var r = rows[i];
+        out += '<tr><td class="rownum">' + (i + 1) + "</td>" +
+          '<td class="sticky-l cname" title="' + esc(r.name) + '">' + esc(r.name) + "</td>" +
+          r.trend.map(function (v) { return '<td class="num ' + (Math.abs(v) < 0.5 ? "zero" : "") + '">' + inr(v) + "</td>"; }).join("") +
+          r.prod.map(function (p) {
+            return '<td class="num ' + (p.users < 0.5 ? "zero" : "") + '">' + Math.round(p.users).toLocaleString("en-IN") + "</td>" +
+              '<td class="num ' + (p.revenue < 0.5 ? "zero" : "") + '">' + inr(p.revenue) + "</td>";
+          }).join("") +
+          "</tr>";
+      }
+      return out;
+    });
   }
 
   var moveSel = view.querySelector("#moveSel");
@@ -221,6 +337,9 @@ export function renderMrrMovement() {
   var mA = view.querySelector("#monthASel"), mB = view.querySelector("#monthBSel");
   if (mA) mA.addEventListener("change", function () { state.mrrA = mA.value; render(); });
   if (mB) mB.addEventListener("change", function () { state.mrrB = mB.value; render(); });
+  view.querySelectorAll("[data-tiermetric]").forEach(function (b) {
+    b.addEventListener("click", function () { state.mrrTierMetric = b.getAttribute("data-tiermetric"); render(); });
+  });
   wireSearchSort(view);
 
   window.__csv = function () {

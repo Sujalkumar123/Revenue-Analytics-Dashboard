@@ -37,6 +37,31 @@ export function aggregate(ds, sheet, months, filterFn) {
   return map;
 }
 
+/* Per-client, per-month user count — NOT prorated by days like monthlyOf()
+   (a client active any part of the month counts its full user total for
+   that month, matching how "users this month" is actually meant, unlike
+   revenue recognition). Same overlap test computeProvisional() already
+   used inline for its own users-by-client pass; pulled out here so other
+   views (MRR Movement's per-product breakdown) can reuse it without
+   duplicating the loop. */
+export function aggregateUsers(ds, sheet, months, filterFn) {
+  var map = new Map();
+  for (var i = 0; i < ds.rows.length; i++) {
+    if (filterFn && !filterFn(ds, sheet, i)) continue;
+    var p = effPeriod(ds, sheet, i);
+    if (!p) continue;
+    var name = fieldVal(ds, sheet, i, "client");
+    var arr = map.get(name);
+    if (!arr) { arr = new Array(months.length).fill(0); map.set(name, arr); }
+    var u = parseFloat(fieldVal(ds, sheet, i, "users")) || 0;
+    for (var m = 0; m < months.length; m++) {
+      if (months[m].e < p.s || months[m].s > p.e) continue;
+      arr[m] += u;
+    }
+  }
+  return map;
+}
+
 /* Net = Gross minus Credit, but netted per INVOICE LINE rather than at the
    aggregate client+month level: for each Invoice working line, find any
    Credit Note Working line raised against that exact invoice number and

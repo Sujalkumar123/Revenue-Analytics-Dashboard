@@ -12,7 +12,7 @@ export var state = {
   tab: "recurr", fy: "2024-25", metric: "net", search: "", sort: "total_desc", flagOnly: false, provFilter: "all",
   /* MRR Movement's own two-month picker — null means "not chosen yet",
      resolved to the two most recent months with data on first render. */
-  mrrA: null, mrrB: null, mrrMoveFilter: "all"
+  mrrA: null, mrrB: null, mrrMoveFilter: "all", mrrTierMetric: "mrr"
 };
 
 export var TABS = [
