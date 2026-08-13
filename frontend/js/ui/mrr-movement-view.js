@@ -30,12 +30,15 @@ function classify(a, b) {
   return "flat";
 }
 var MOVE_LABEL = { new: "New", growth: "Growth", decline: "Decline", churned: "Churned", flat: "Flat" };
+/* Same order (and the same "Other modules has no Users column") as the
+   source sheet's own column layout — it tracks Users for every product
+   except Other modules, which is revenue-only there too. */
 var PRODUCTS = [
   { key: "gt", label: "SFA GT", product: "GT subscription" },
   { key: "dms", label: "DMS", product: "DMS subscription" },
-  { key: "mt", label: "SFA MT", product: "MT subscription" },
   { key: "flo", label: "Flo", product: "Flo subscription" },
-  { key: "other", label: "Other modules", product: "Other modules" }
+  { key: "mt", label: "SFA MT", product: "MT subscription" },
+  { key: "other", label: "Other modules", product: "Other modules", noUsers: true }
 ];
 
 export function renderMrrMovement() {
@@ -96,24 +99,45 @@ export function renderMrrMovement() {
 
   rows.sort(function (x, y) { return Math.abs(y.delta) - Math.abs(x.delta); });
 
-  /* Second section: a 3-month trend of each client's total (still
-     provisional-aware, via resolved()) plus a per-product snapshot for
-     the latest month only. Product figures are real invoiced amounts only
-     — computeProvisional() blends a client's projection at the whole-
-     client level, not per product, so there's nothing to project a single
-     product column from; a client currently running on a projected total
-     will show 0s across every product here even though its trend/bridge
-     total above is nonzero. Reuses the exact same (already filtered)
-     client list as the bridge above, so the two sections never disagree
-     about who's in view. */
+  /* Second section: a 3-month trend of each client's total Users + Revenue
+     (revenue still provisional-aware, via resolved()) plus a per-product
+     snapshot for the latest month only — same column order as the source
+     sheet (SFA, DMS, Flo, SFA MT, then Other modules revenue-only).
+     Product figures are real invoiced amounts only — computeProvisional()
+     blends a client's projection at the whole-client level, not per
+     product, so there's nothing to project a single product column from;
+     a client currently running on a projected total will show 0s across
+     every product here even though its trend/bridge total above is
+     nonzero. Reuses the exact same (already filtered) client list as the
+     bridge above, so the two sections never disagree about who's in view. */
   var trendIdx = [Math.max(0, idxB - 2), Math.max(0, idxB - 1), idxB];
   var trendMonths = trendIdx.map(function (i) { return months[i]; });
   var prodMaps = PRODUCTS.map(function (p) {
     return { gross: aggregate(S.consol, "consol", months, recurringProduct(p.product)), users: aggregateUsers(S.consol, "consol", months, recurringProduct(p.product)) };
   });
+  /* Total Users = the sum of only the seat-licensed products (everything
+     except Other modules), NOT a blind sum of every recurring row's
+     "users" field. Found live while building this: several "Image
+     Recognition-M" lines (an Other-modules item) carry values in the
+     millions in that field — clearly a scan/image count, not a user
+     seat count, for that specific item. Summing it in unfiltered inflated
+     one client's "Users" trend to 42+ lakh. Reusing prodMaps here (rather
+     than a fresh onlyRecurring aggregateUsers call) means this fix and
+     the per-product Users columns can never drift apart. */
+  var usersAll = new Map();
+  prodMaps.forEach(function (pm, pi) {
+    if (PRODUCTS[pi].noUsers) return;
+    pm.users.forEach(function (arr, client) {
+      var acc = usersAll.get(client);
+      if (!acc) { acc = new Array(months.length).fill(0); usersAll.set(client, acc); }
+      for (var m = 0; m < months.length; m++) acc[m] += arr[m];
+    });
+  });
   rows.forEach(function (r) {
-    var garr = gross.get(r.name);
-    r.trend = trendIdx.map(function (idx) { return garr ? resolved(r.name, garr, idx) : 0; });
+    var garr = gross.get(r.name), uarr = usersAll.get(r.name);
+    r.trend = trendIdx.map(function (idx) {
+      return { users: uarr ? (uarr[idx] || 0) : 0, revenue: garr ? resolved(r.name, garr, idx) : 0 };
+    });
     r.prod = prodMaps.map(function (pm) {
       var g = pm.gross.get(r.name), u = pm.users.get(r.name);
       return { revenue: g ? (g[idxB] || 0) : 0, users: u ? (u[idxB] || 0) : 0 };
@@ -128,7 +152,6 @@ export function renderMrrMovement() {
      but built from the same resolved()/provisional-aware totals. */
   var tierIdx = []; for (var ti = Math.max(0, idxB - 11); ti <= idxB; ti++) tierIdx.push(ti);
   var tierMonths = tierIdx.map(function (i) { return months[i]; });
-  var usersAll = aggregateUsers(S.consol, "consol", months, onlyRecurring);
   var TIER_ROWS = TIERS.concat(["Unclassified"]);
   var tierData = {};
   TIER_ROWS.forEach(function (t) { tierData[t] = { mrr: new Array(tierIdx.length).fill(0), users: new Array(tierIdx.length).fill(0) }; });
@@ -199,22 +222,27 @@ export function renderMrrMovement() {
   html += '</tbody></table><div class="sentinel" aria-hidden="true"></div></div>' +
     (rows.length ? loadMoreHTML(rows.length, true) : "") + "</div>";
 
-  /* Section 2: per-product User count + Revenue snapshot, plus a 3-month
-     total-MRR trend leading up to it. */
+  /* Section 2: 3-month trend of total Users + Revenue, then a per-product
+     Users + Revenue snapshot for the latest month (Other modules is
+     revenue-only, matching the source sheet — see the PRODUCTS comment). */
+  var prodColCount = PRODUCTS.reduce(function (n, p) { return n + (p.noUsers ? 1 : 2); }, 0);
   html += '<div class="card"><div class="toolbar"><b style="font-size:13px">Product breakdown</b>' +
-    '<span style="color:var(--ink-3);font-size:12px">Users + revenue for ' + esc(monthB.label) +
-    ' · trend through ' + esc(trendMonths[0].label) + ' → ' + esc(trendMonths[2].label) + '</span></div>';
+    '<span style="color:var(--ink-3);font-size:12px">Users + revenue trend ' + esc(trendMonths[0].label) +
+    ' → ' + esc(trendMonths[2].label) + ' · products as of ' + esc(monthB.label) + '</span></div>';
   html += '<div class="grid-wrap" id="gw2"><table class="grid"><thead><tr class="hdr-row">' +
     '<th class="rownum" style="width:38px"></th>' +
     '<th class="lbl sticky-l" style="width:270px">Client</th>' +
-    trendMonths.map(function (m) { return '<th class="num" style="width:110px">' + esc(m.label) + "</th>"; }).join("") +
+    trendMonths.map(function (m) {
+      return '<th class="num" style="width:90px">' + esc(m.label) + ' Users</th>' +
+        '<th class="num" style="width:110px">' + esc(m.label) + ' Revenue</th>';
+    }).join("") +
     PRODUCTS.map(function (p) {
-      return '<th class="num" style="width:80px">' + esc(p.label) + ' Users</th>' +
-        '<th class="num" style="width:110px">' + esc(p.label) + ' MRR</th>';
+      return (p.noUsers ? "" : '<th class="num" style="width:80px">' + esc(p.label) + ' Users</th>') +
+        '<th class="num" style="width:110px">' + esc(p.label) + ' Revenue</th>';
     }).join("") +
     "</tr></thead><tbody id=\"tb2\">";
   if (!rows.length) {
-    html += '<tr><td colspan="' + (2 + trendMonths.length + PRODUCTS.length * 2) + '" style="padding:26px;text-align:center;color:var(--ink-3)">No matching clients.</td></tr>';
+    html += '<tr><td colspan="' + (2 + trendMonths.length * 2 + prodColCount) + '" style="padding:26px;text-align:center;color:var(--ink-3)">No matching clients.</td></tr>';
   }
   html += '</tbody></table><div class="sentinel" aria-hidden="true"></div></div>' +
     (rows.length ? loadMoreHTML(rows.length, false) : "") + "</div>";
@@ -321,9 +349,12 @@ export function renderMrrMovement() {
         var r = rows[i];
         out += '<tr><td class="rownum">' + (i + 1) + "</td>" +
           '<td class="sticky-l cname" title="' + esc(r.name) + '">' + esc(r.name) + "</td>" +
-          r.trend.map(function (v) { return '<td class="num ' + (Math.abs(v) < 0.5 ? "zero" : "") + '">' + inr(v) + "</td>"; }).join("") +
-          r.prod.map(function (p) {
-            return '<td class="num ' + (p.users < 0.5 ? "zero" : "") + '">' + Math.round(p.users).toLocaleString("en-IN") + "</td>" +
+          r.trend.map(function (t) {
+            return '<td class="num ' + (t.users < 0.5 ? "zero" : "") + '">' + Math.round(t.users).toLocaleString("en-IN") + "</td>" +
+              '<td class="num ' + (Math.abs(t.revenue) < 0.5 ? "zero" : "") + '">' + inr(t.revenue) + "</td>";
+          }).join("") +
+          r.prod.map(function (p, pi) {
+            return (PRODUCTS[pi].noUsers ? "" : '<td class="num ' + (p.users < 0.5 ? "zero" : "") + '">' + Math.round(p.users).toLocaleString("en-IN") + "</td>") +
               '<td class="num ' + (p.revenue < 0.5 ? "zero" : "") + '">' + inr(p.revenue) + "</td>";
           }).join("") +
           "</tr>";
