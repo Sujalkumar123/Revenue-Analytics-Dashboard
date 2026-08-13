@@ -238,6 +238,7 @@ export function renderMrrMovement() {
      revenue-only, matching the source sheet — see the PRODUCTS comment). */
   var prodColCount = PRODUCTS.reduce(function (n, p) { return n + (p.noUsers ? 1 : 2); }, 0);
   html += '<div class="card mrr-card mrr-card-product" id="mrrProduct"><div class="toolbar"><b style="font-size:13px">Product breakdown</b>' +
+    '<input type="search" id="q2" placeholder="Search client…" value="' + esc(state.search) + '" />' +
     '<span style="color:var(--ink-3);font-size:12px">Users + revenue trend ' + esc(trendMonths[0].label) +
     ' → ' + esc(trendMonths[2].label) + ' · products as of ' + esc(monthB.label) + '</span></div>';
   html += '<div class="grid-wrap" id="gw2"><table class="grid"><thead><tr class="hdr-row">' +
@@ -390,6 +391,18 @@ export function renderMrrMovement() {
     });
   });
   wireSearchSort(view);
+  /* Product breakdown's own search box — same shared state.search as the
+     Bridge table's, just a second visible box so filtering doesn't mean
+     jumping back up to the top section every time. Tier summary has no
+     per-client rows (just 4 tier totals), so it has nothing to search. */
+  var q2 = view.querySelector("#q2");
+  if (q2) {
+    var q2Timer;
+    q2.addEventListener("input", function () {
+      clearTimeout(q2Timer);
+      q2Timer = setTimeout(function () { state.search = q2.value; render(true); }, 180);
+    });
+  }
 
   window.__csv = function () {
     var lines = [["Client", "Tier", monthA.label, monthB.label, "Delta", "Movement", "Remarks"].join(",")];

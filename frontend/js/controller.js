@@ -18,7 +18,7 @@ import { SEL } from "./ui/selection.js";
 export function render(keepFocus) {
   if (!readyFlag.value) return;
   var focusId = keepFocus && document.activeElement ? document.activeElement.id : null;
-  var selStart = focusId === "q" ? document.activeElement.selectionStart : null;
+  var selStart = (focusId === "q" || focusId === "q2") ? document.activeElement.selectionStart : null;
   SEL.clear();
 
   if (state.tab === "mrr") {
@@ -43,8 +43,8 @@ export function render(keepFocus) {
     renderCreditNoteDump();
   }
 
-  if (focusId === "q") {
-    var q = document.getElementById("q");
+  if (focusId === "q" || focusId === "q2") {
+    var q = document.getElementById(focusId);
     if (q) { q.focus(); try { q.setSelectionRange(selStart, selStart); } catch (e) {} }
   }
 }

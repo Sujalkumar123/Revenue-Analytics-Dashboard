@@ -418,7 +418,18 @@ td.sticky-l{cursor:pointer}
    the nav links above, so the nav doubles as a legend for them.
    `main > .card` beats a bare `.mrr-card` on specificity (it sets its own
    border shorthand), so these repeat that `main > .card` prefix to win. */
-main > .card.mrr-card{border-top:4px solid transparent}
+/* main > .card is written for exactly one full-viewport sticky panel per
+   tab (position:sticky + height:100dvh + overflow:hidden) — stacking
+   three of them competes for the same sticky slot, which is what made the
+   jump-nav unreliable (scrollIntoView on a sticky element can report
+   "already there" without actually moving window scroll, so a second
+   click in a row could silently no-op). Overridden back to a plain block
+   card here: the page scrolls normally between the three sections, and
+   each section's own grid-wrap gets a capped height + its own scrollbar
+   instead, so a table taller than the screen doesn't just run off the
+   bottom un-navigably. */
+main > .card.mrr-card{position:static;height:auto;overflow:visible;margin-bottom:16px;border-top:4px solid transparent}
+main > .card.mrr-card .grid-wrap{max-height:min(72vh,720px)}
 main > .card.mrr-card-bridge{border-top-color:var(--accent)}
 main > .card.mrr-card-bridge .toolbar{background:var(--accent-soft)}
 .mrr-card-bridge .toolbar b{color:var(--accent)}
