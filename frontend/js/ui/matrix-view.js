@@ -107,6 +107,9 @@ export function renderMatrix(opts) {
 
   var term = state.search.trim().toLowerCase();
   if (term) rows = rows.filter(function (r) { return r.name.toLowerCase().indexOf(term) !== -1; });
+  if (opts.projectable && state.provOnly) {
+    rows = rows.filter(function (r) { return r.prov.some(function (s) { return s === "pending"; }); });
+  }
   rows.sort(state.sort === "name_asc"
     ? function (a, b) { return a.name.localeCompare(b.name); }
     : state.sort === "total_asc"
@@ -122,6 +125,13 @@ export function renderMatrix(opts) {
   if (vstate.filters.name) {
     rows = rows.filter(function (r) { return vstate.filters.name.has(r.name); });
   }
+
+  /* Count reflects whatever's currently on screen (search/column-filters
+     already applied above) — same convention as the ledger's "Needs
+     attention" count, which also recomputes post-filter. */
+  var pendingCount = opts.projectable
+    ? rows.filter(function (r) { return r.prov.some(function (s) { return s === "pending"; }); }).length
+    : 0;
 
   var colTot = months.map(function (_, i) {
     return rows.reduce(function (s, r) { return s + r.vals[i]; }, 0);
@@ -155,7 +165,9 @@ export function renderMatrix(opts) {
       ? (mxCount() ? '<button class="icon-btn" id="clrMx">Reset ' + mxCount() + " override(s)</button>" : "")
       : '<span class="badge-lock">🔒 ' + (opts.editable ? "Read-only access" : "Derived — read-only") + "</span>") +
     (vstate.filters.name ? '<button class="icon-btn" id="clrFilters">Clear filter</button>' : "") +
-    toolbarControlsHTML() + "</div>";
+    (opts.projectable && pendingCount ? '<button class="chip-warn" id="onlyProv" aria-pressed="' + state.provOnly + '">⏳ ' +
+      (state.provOnly ? "Showing pending confirmation (" : "Pending confirmation (") + pendingCount + ")</button>" : "") +
+    toolbarControlsHTML({ noExport: true }) + "</div>";
 
   html += '<div class="grid-wrap" id="gw"><table class="grid"><thead>' +
     '<tr class="hdr-row"><th class="rownum" style="width:38px"></th>' +
@@ -172,7 +184,7 @@ export function renderMatrix(opts) {
     html += '<tr><td colspan="' + (months.length + 3) + '" style="padding:26px;text-align:center;color:var(--ink-3)">No matching clients.</td></tr>';
   }
   html += '</tbody></table><div class="sentinel" aria-hidden="true"></div></div>' +
-    (rows.length ? loadMoreHTML(rows.length) : "") + "</div>";
+    (rows.length ? loadMoreHTML(rows.length, true) : "") + "</div>";
 
   var view = document.getElementById("view");
   view.innerHTML = html;
@@ -300,6 +312,8 @@ export function renderMatrix(opts) {
   view.querySelectorAll("[data-metric]").forEach(function (b) {
     b.addEventListener("click", function () { state.metric = b.getAttribute("data-metric"); render(); });
   });
+  var onlyProv = view.querySelector("#onlyProv");
+  if (onlyProv) onlyProv.addEventListener("click", function () { state.provOnly = !state.provOnly; render(); });
   wireSearchSort(view);
 
   var clrF = view.querySelector("#clrFilters");
