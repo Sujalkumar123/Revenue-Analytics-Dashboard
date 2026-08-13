@@ -386,25 +386,30 @@ td.sticky-l{cursor:pointer}
 /* MRR Movement's section jump-nav — three long tables stacked on one page
    read as "all the same" once scrolled past the first, and scrolling back
    up to compare sections costs time an admin in a hurry doesn't want to
-   spend. Pinned to the left edge regardless of scroll depth; each link's
-   accent color matches its section's own card-accent below, so the nav
-   itself previews which color means which table. */
+   spend. Bottom-right, same corner and pill shape as the range-selection
+   statusbar elsewhere in the app (never both on screen at once — this tab
+   doesn't use cell-range selection) — a left-edge placement tried first
+   sat directly on top of the sticky Client column and covered names, so
+   this stays clear of every table's own content. Each link's accent color
+   matches its section's own card-accent below, so the nav previews which
+   color means which table. */
 .mrr-nav{
-  position:fixed;left:16px;top:50%;transform:translateY(-50%);z-index:60;
-  display:flex;flex-direction:column;gap:2px;
+  position:fixed;right:16px;bottom:14px;z-index:60;
+  display:flex;align-items:stretch;
   background:var(--panel);border:1px solid var(--border-strong);border-radius:11px;
-  box-shadow:var(--shadow-lg);padding:6px;
+  box-shadow:var(--shadow-lg);overflow:hidden;
 }
 .mrr-nav-link{
-  display:block;padding:8px 12px;border-radius:7px;font-size:11.5px;font-weight:700;
-  text-decoration:none;color:var(--ink-2);border-left:3px solid transparent;
-  transition:background .12s,border-color .12s;
+  display:flex;align-items:center;gap:6px;padding:9px 14px;font-size:11.5px;font-weight:700;
+  text-decoration:none;color:var(--ink-2);border-right:1px solid var(--border-soft);
+  border-top:3px solid transparent;transition:background .12s;
 }
+.mrr-nav-link:last-child{border-right:none}
 .mrr-nav-link:hover{background:var(--surface-2)}
-.mrr-nav-bridge{border-left-color:var(--accent)}
-.mrr-nav-product{border-left-color:var(--gold)}
-.mrr-nav-tier{border-left-color:var(--good)}
-@media(max-width:900px){ .mrr-nav{display:none} }
+.mrr-nav-bridge{border-top-color:var(--accent)}
+.mrr-nav-product{border-top-color:var(--gold)}
+.mrr-nav-tier{border-top-color:var(--good)}
+@media(max-width:720px){ .mrr-nav{right:8px;bottom:8px} .mrr-nav-link{padding:7px 10px} }
 
 /* The three MRR Movement cards get a colored top edge PLUS a tinted
    toolbar strip (not just a thin line — a subtle line alone was still
