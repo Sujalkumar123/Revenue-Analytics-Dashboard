@@ -65,21 +65,25 @@ export function renderMatrix(opts) {
     var g = gross.get(n) || new Array(months.length).fill(0);
     var c = credit.get(n) || new Array(months.length).fill(0);
     var nt = net.get(n) || new Array(months.length).fill(0);
-    /* prov[i]: undefined (no projection here), "pending", "confirmed" or
-       "churned". Only substituted where the real gross figure is zero — a
-       month that already has a real invoice is never overridden by a
-       projection, regardless of status. Confirming a cell doesn't change
-       its number (per design) — it just re-labels "pending" -> "confirmed";
-       churning zeroes it back out. */
+    /* prov[i]: undefined (no projection here) or the status of the ONE cell
+       that's actionable — the most recent month with no invoice yet (the
+       last key inserted into clientOverlay, since computeProvisional()
+       walks months forward in order). Every provisional month still counts
+       toward revenue (spliced into g/nt below regardless), but only that
+       edge month gets the visible badge/border and Confirm/Reject controls
+       — a client that's gone 8 months without an invoice doesn't need 8
+       identical flagged cells, just the one that's actually new/undecided. */
     var prov = [];
     var clientOverlay = overlay.get(n);
     if (clientOverlay) {
+      var lastProvLabel = null;
+      clientOverlay.forEach(function (_, ml) { lastProvLabel = ml; });
       for (var pi = 0; pi < months.length; pi++) {
         if (Math.abs(g[pi]) >= 0.5) continue;
         var projAmt = clientOverlay.get(months[pi].label);
         if (projAmt === undefined) continue;
         var st = getProvStatus(n, months[pi].label) || "pending";
-        prov[pi] = st;
+        if (months[pi].label === lastProvLabel) prov[pi] = st;
         if (st === "churned") continue;   // stays zero — excluded from revenue
         g[pi] = projAmt;
         nt[pi] = projAmt;
