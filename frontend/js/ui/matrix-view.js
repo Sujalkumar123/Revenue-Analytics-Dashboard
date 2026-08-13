@@ -169,7 +169,7 @@ export function renderMatrix(opts) {
   var provSelHTML = opts.projectable
     ? '<select id="provSel" title="Filter by projected-revenue status" class="prov-filter-sel' +
       (state.provFilter !== "all" ? " active" : "") + '">' +
-      '<option value="all"' + (state.provFilter === "all" ? " selected" : "") + ">All clients</option>" +
+      '<option value="all"' + (state.provFilter === "all" ? " selected" : "") + ">Provisional status: All</option>" +
       '<option value="pending"' + (state.provFilter === "pending" ? " selected" : "") + ">⏳ Pending confirmation (" + pendingCount + ")</option>" +
       '<option value="confirmed"' + (state.provFilter === "confirmed" ? " selected" : "") + ">✓ Confirmed actual (" + confirmedCount + ")</option>" +
       '<option value="churned"' + (state.provFilter === "churned" ? " selected" : "") + ">✕ Marked churn (" + churnedCount + ")</option>" +
