@@ -237,25 +237,39 @@ export function renderMrrMovement() {
 
   /* Section 2: 3-month trend of total Users + Revenue, then a per-product
      Users + Revenue snapshot for the latest month (Other modules is
-     revenue-only, matching the source sheet — see the PRODUCTS comment). */
+     revenue-only, matching the source sheet — see the PRODUCTS comment).
+     A plain background tint on the leaf columns (first attempt) turned
+     out too subtle to read as "one group" scanning fast — this now has a
+     real two-row header, product name shown ONCE in a solid-color band
+     spanning its own Users+Revenue pair, plus a divider border at every
+     group boundary, so the grouping doesn't depend on noticing a faint
+     tint at all. table-layout:fixed takes its column widths from a
+     <colgroup>, since a colspanned header cell can't carry a leaf width. */
   var prodColCount = PRODUCTS.reduce(function (n, p) { return n + (p.noUsers ? 1 : 2); }, 0);
+  var leafCols = [{ w: 38 }, { w: 270 }];
+  trendMonths.forEach(function () { leafCols.push({ w: 90 }, { w: 110 }); });
+  PRODUCTS.forEach(function (p) { if (!p.noUsers) leafCols.push({ w: 80 }); leafCols.push({ w: 110 }); });
   html += '<div class="card mrr-card mrr-card-product" id="mrrProduct"><div class="toolbar"><b style="font-size:13px">Product breakdown</b>' +
     '<input type="search" id="q2" placeholder="Search client…" value="' + esc(state.search) + '" />' +
     '<span style="color:var(--ink-3);font-size:12px">Users + revenue trend ' + esc(trendMonths[0].label) +
     ' → ' + esc(trendMonths[2].label) + ' · products as of ' + esc(monthB.label) + '</span></div>';
-  html += '<div class="grid-wrap" id="gw2"><table class="grid"><thead><tr class="hdr-row">' +
-    '<th class="rownum" style="width:38px"></th>' +
-    '<th class="lbl sticky-l" style="width:270px">Client</th>' +
-    trendMonths.map(function (m) {
-      return '<th class="num" style="width:90px">' + esc(m.label) + ' Users</th>' +
-        '<th class="num" style="width:110px">' + esc(m.label) + ' Revenue</th>';
-    }).join("") +
-    /* Each product's Users+Revenue pair shares one background tint (batch-*
-       below), so the two columns read as one group at a glance instead of
-       blending into the wall of numbers either side of them. */
+  html += '<div class="grid-wrap" id="gw2"><table class="grid">' +
+    "<colgroup>" + leafCols.map(function (c) { return '<col style="width:' + c.w + 'px">'; }).join("") + "</colgroup>" +
+    '<thead><tr class="hdr-row hdr-batch-row">' +
+    '<th class="rownum" rowspan="2"></th>' +
+    '<th class="lbl sticky-l" rowspan="2">Client</th>' +
+    '<th class="num hdr-batch-total" colspan="' + (trendMonths.length * 2) + '">Total</th>' +
     PRODUCTS.map(function (p) {
-      return (p.noUsers ? "" : '<th class="num batch-' + p.color + '" style="width:80px">' + esc(p.label) + ' Users</th>') +
-        '<th class="num batch-' + p.color + '" style="width:110px">' + esc(p.label) + ' Revenue</th>';
+      return '<th class="num batch-' + p.color + ' grp-edge" colspan="' + (p.noUsers ? 1 : 2) + '">' + esc(p.label) + "</th>";
+    }).join("") +
+    '</tr><tr class="hdr-row hdr-subrow">' +
+    trendMonths.map(function (m) {
+      return '<th class="num">' + esc(m.label) + ' Users</th>' +
+        '<th class="num">' + esc(m.label) + ' Revenue</th>';
+    }).join("") +
+    PRODUCTS.map(function (p) {
+      return (p.noUsers ? "" : '<th class="num batch-' + p.color + ' grp-edge">Users</th>') +
+        '<th class="num batch-' + p.color + (p.noUsers ? " grp-edge" : "") + '">Revenue</th>';
     }).join("") +
     "</tr></thead><tbody id=\"tb2\">";
   if (!rows.length) {
@@ -372,8 +386,8 @@ export function renderMrrMovement() {
           }).join("") +
           r.prod.map(function (p, pi) {
             var pr = PRODUCTS[pi];
-            return (pr.noUsers ? "" : '<td class="num batch-' + pr.color + ' ' + (p.users < 0.5 ? "zero" : "") + '">' + Math.round(p.users).toLocaleString("en-IN") + "</td>") +
-              '<td class="num batch-' + pr.color + ' ' + (p.revenue < 0.5 ? "zero" : "") + '">' + inr(p.revenue) + "</td>";
+            return (pr.noUsers ? "" : '<td class="num batch-' + pr.color + ' grp-edge ' + (p.users < 0.5 ? "zero" : "") + '">' + Math.round(p.users).toLocaleString("en-IN") + "</td>") +
+              '<td class="num batch-' + pr.color + (pr.noUsers ? " grp-edge" : "") + " " + (p.revenue < 0.5 ? "zero" : "") + '">' + inr(p.revenue) + "</td>";
           }).join("") +
           "</tr>";
       }
