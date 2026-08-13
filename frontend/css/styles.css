@@ -204,6 +204,13 @@ select:focus,input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--a
   transition:background .13s,border-color .13s,color .13s}
 .chip-tool:hover{border-color:var(--accent)}
 
+/* Sits where CSV export used to on Recurring Revenue's toolbar — filters
+   the grid by projected-revenue status. Gold border once a non-"All"
+   option is picked, same "a filter is active" signal as the column-filter
+   funnel dot. */
+.prov-filter-sel{border-color:var(--border-strong)}
+.prov-filter-sel.active{border-color:var(--gold);color:var(--gold)}
+
 /* ═════════ grid ═════════ */
 .grid-wrap{overflow:auto;position:relative;flex:1;min-height:0;contain:paint;will-change:scroll-position}
 table.grid{border-collapse:separate;border-spacing:0;font-size:12.5px;table-layout:fixed;width:max-content}

@@ -107,8 +107,17 @@ export function renderMatrix(opts) {
 
   var term = state.search.trim().toLowerCase();
   if (term) rows = rows.filter(function (r) { return r.name.toLowerCase().indexOf(term) !== -1; });
-  if (opts.projectable && state.provOnly) {
-    rows = rows.filter(function (r) { return r.prov.some(function (s) { return s === "pending"; }); });
+
+  /* Counts reflect the search box but not the dropdown's own filter (so the
+     dropdown's option labels stay meaningful no matter which one is
+     currently selected) — same "has" check the filter below uses. */
+  function hasProv(status) { return function (r) { return r.prov.some(function (s) { return s === status; }); }; }
+  var pendingCount = opts.projectable ? rows.filter(hasProv("pending")).length : 0;
+  var confirmedCount = opts.projectable ? rows.filter(hasProv("confirmed")).length : 0;
+  var churnedCount = opts.projectable ? rows.filter(hasProv("churned")).length : 0;
+
+  if (opts.projectable && state.provFilter !== "all") {
+    rows = rows.filter(hasProv(state.provFilter));
   }
   rows.sort(state.sort === "name_asc"
     ? function (a, b) { return a.name.localeCompare(b.name); }
@@ -125,13 +134,6 @@ export function renderMatrix(opts) {
   if (vstate.filters.name) {
     rows = rows.filter(function (r) { return vstate.filters.name.has(r.name); });
   }
-
-  /* Count reflects whatever's currently on screen (search/column-filters
-     already applied above) — same convention as the ledger's "Needs
-     attention" count, which also recomputes post-filter. */
-  var pendingCount = opts.projectable
-    ? rows.filter(function (r) { return r.prov.some(function (s) { return s === "pending"; }); }).length
-    : 0;
 
   var colTot = months.map(function (_, i) {
     return rows.reduce(function (s, r) { return s + r.vals[i]; }, 0);
@@ -165,8 +167,15 @@ export function renderMatrix(opts) {
       ? (mxCount() ? '<button class="icon-btn" id="clrMx">Reset ' + mxCount() + " override(s)</button>" : "")
       : '<span class="badge-lock">🔒 ' + (opts.editable ? "Read-only access" : "Derived — read-only") + "</span>") +
     (vstate.filters.name ? '<button class="icon-btn" id="clrFilters">Clear filter</button>' : "") +
-    (opts.projectable && pendingCount ? '<button class="chip-warn" id="onlyProv" aria-pressed="' + state.provOnly + '">⏳ ' +
-      (state.provOnly ? "Showing pending confirmation (" : "Pending confirmation (") + pendingCount + ")</button>" : "") +
+    (opts.projectable
+      ? '<select id="provSel" title="Filter by projected-revenue status" class="prov-filter-sel' +
+        (state.provFilter !== "all" ? " active" : "") + '">' +
+        '<option value="all"' + (state.provFilter === "all" ? " selected" : "") + ">All clients</option>" +
+        '<option value="pending"' + (state.provFilter === "pending" ? " selected" : "") + ">⏳ Pending confirmation (" + pendingCount + ")</option>" +
+        '<option value="confirmed"' + (state.provFilter === "confirmed" ? " selected" : "") + ">✓ Confirmed actual (" + confirmedCount + ")</option>" +
+        '<option value="churned"' + (state.provFilter === "churned" ? " selected" : "") + ">✕ Marked churn (" + churnedCount + ")</option>" +
+        "</select>"
+      : "") +
     toolbarControlsHTML({ noExport: true }) + "</div>";
 
   html += '<div class="grid-wrap" id="gw"><table class="grid"><thead>' +
@@ -312,8 +321,8 @@ export function renderMatrix(opts) {
   view.querySelectorAll("[data-metric]").forEach(function (b) {
     b.addEventListener("click", function () { state.metric = b.getAttribute("data-metric"); render(); });
   });
-  var onlyProv = view.querySelector("#onlyProv");
-  if (onlyProv) onlyProv.addEventListener("click", function () { state.provOnly = !state.provOnly; render(); });
+  var provSel = view.querySelector("#provSel");
+  if (provSel) provSel.addEventListener("change", function () { state.provFilter = provSel.value; render(); });
   wireSearchSort(view);
 
   var clrF = view.querySelector("#clrFilters");

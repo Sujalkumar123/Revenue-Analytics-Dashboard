@@ -8,7 +8,7 @@ import { FYS } from "../core/dates.js";
 export var S = { consol: null, credit: null, dims: null, invoiceDump: null, creditNoteDump: null };
 export var readyFlag = { value: false };
 
-export var state = { tab: "recurr", fy: "2024-25", metric: "net", search: "", sort: "total_desc", flagOnly: false, provOnly: false };
+export var state = { tab: "recurr", fy: "2024-25", metric: "net", search: "", sort: "total_desc", flagOnly: false, provFilter: "all" };
 
 export var TABS = [
   { id: "recurr",        label: "Recurring Revenue" },
