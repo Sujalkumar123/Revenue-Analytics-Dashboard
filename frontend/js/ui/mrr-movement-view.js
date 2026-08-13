@@ -177,7 +177,18 @@ export function renderMrrMovement() {
   });
   var netMRR = newMRR + growthMRR + declineMRR + churnedMRR;
 
-  var html = '<div class="kpis">' +
+  /* Fixed jump-nav, left edge — three sections stacked on one page reads
+     as "mixed together" once you're scrolled past the first one, and
+     scrolling back up to switch between them is dead time when you're in
+     a hurry. position:fixed so it stays put regardless of scroll depth;
+     each link just jumps straight to its section's anchor. */
+  var html = '<div class="mrr-nav" aria-label="Jump to section">' +
+    '<a href="#mrrBridge" class="mrr-nav-link mrr-nav-bridge" title="MRR Bridge">Bridge</a>' +
+    '<a href="#mrrProduct" class="mrr-nav-link mrr-nav-product" title="Product breakdown">Products</a>' +
+    '<a href="#mrrTier" class="mrr-nav-link mrr-nav-tier" title="Tier summary">Tiers</a>' +
+    "</div>";
+
+  html += '<div class="kpis">' +
     kpiCard("New MRR · " + monthB.label, inrShort(newMRR), moveCounts.new + " new client(s)") +
     kpiCard("Expansion", inrShort(growthMRR), moveCounts.growth + " growing", "up") +
     kpiCard("Contraction", inrShort(declineMRR), moveCounts.decline + " declining", "down") +
@@ -185,7 +196,7 @@ export function renderMrrMovement() {
     kpiCard("Net movement", inrShort(netMRR), monthA.label + " → " + monthB.label, netMRR >= 0 ? "up" : "down") +
     "</div>";
 
-  html += '<div class="card"><div class="toolbar">' +
+  html += '<div class="card mrr-card mrr-card-bridge" id="mrrBridge"><div class="toolbar"><b style="font-size:13px">MRR Bridge</b>' +
     '<input type="search" id="q" placeholder="Search client…" value="' + esc(state.search) + '" />' +
     '<select id="moveSel" title="Filter by movement type">' +
     '<option value="all"' + (state.mrrMoveFilter === "all" ? " selected" : "") + ">All movement</option>" +
@@ -226,7 +237,7 @@ export function renderMrrMovement() {
      Users + Revenue snapshot for the latest month (Other modules is
      revenue-only, matching the source sheet — see the PRODUCTS comment). */
   var prodColCount = PRODUCTS.reduce(function (n, p) { return n + (p.noUsers ? 1 : 2); }, 0);
-  html += '<div class="card"><div class="toolbar"><b style="font-size:13px">Product breakdown</b>' +
+  html += '<div class="card mrr-card mrr-card-product" id="mrrProduct"><div class="toolbar"><b style="font-size:13px">Product breakdown</b>' +
     '<span style="color:var(--ink-3);font-size:12px">Users + revenue trend ' + esc(trendMonths[0].label) +
     ' → ' + esc(trendMonths[2].label) + ' · products as of ' + esc(monthB.label) + '</span></div>';
   html += '<div class="grid-wrap" id="gw2"><table class="grid"><thead><tr class="hdr-row">' +
@@ -248,7 +259,7 @@ export function renderMrrMovement() {
     (rows.length ? loadMoreHTML(rows.length, false) : "") + "</div>";
 
   /* Section 3: MRR / Users / ARPU by Tier, trailing 12 months. */
-  html += '<div class="card"><div class="toolbar"><b style="font-size:13px">Tier summary</b>' +
+  html += '<div class="card mrr-card mrr-card-tier" id="mrrTier"><div class="toolbar"><b style="font-size:13px">Tier summary</b>' +
     '<div class="seg" role="group" aria-label="Tier metric">' +
     '<button data-tiermetric="mrr" aria-pressed="' + (state.mrrTierMetric === "mrr") + '">MRR</button>' +
     '<button data-tiermetric="users" aria-pressed="' + (state.mrrTierMetric === "users") + '">Users</button>' +
@@ -370,6 +381,13 @@ export function renderMrrMovement() {
   if (mB) mB.addEventListener("change", function () { state.mrrB = mB.value; render(); });
   view.querySelectorAll("[data-tiermetric]").forEach(function (b) {
     b.addEventListener("click", function () { state.mrrTierMetric = b.getAttribute("data-tiermetric"); render(); });
+  });
+  view.querySelectorAll(".mrr-nav-link").forEach(function (a) {
+    a.addEventListener("click", function (e) {
+      e.preventDefault();
+      var target = document.getElementById(a.getAttribute("href").slice(1));
+      if (target) target.scrollIntoView({ behavior: "auto", block: "start" });
+    });
   });
   wireSearchSort(view);
 

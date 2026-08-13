@@ -383,6 +383,47 @@ td.sticky-l{cursor:pointer}
 .statusbar .clear:hover{color:var(--bad)}
 @media(max-width:720px){ .statusbar{right:8px;bottom:8px} .statusbar .stat{min-width:74px;padding:6px 10px} }
 
+/* MRR Movement's section jump-nav — three long tables stacked on one page
+   read as "all the same" once scrolled past the first, and scrolling back
+   up to compare sections costs time an admin in a hurry doesn't want to
+   spend. Pinned to the left edge regardless of scroll depth; each link's
+   accent color matches its section's own card-accent below, so the nav
+   itself previews which color means which table. */
+.mrr-nav{
+  position:fixed;left:16px;top:50%;transform:translateY(-50%);z-index:60;
+  display:flex;flex-direction:column;gap:2px;
+  background:var(--panel);border:1px solid var(--border-strong);border-radius:11px;
+  box-shadow:var(--shadow-lg);padding:6px;
+}
+.mrr-nav-link{
+  display:block;padding:8px 12px;border-radius:7px;font-size:11.5px;font-weight:700;
+  text-decoration:none;color:var(--ink-2);border-left:3px solid transparent;
+  transition:background .12s,border-color .12s;
+}
+.mrr-nav-link:hover{background:var(--surface-2)}
+.mrr-nav-bridge{border-left-color:var(--accent)}
+.mrr-nav-product{border-left-color:var(--gold)}
+.mrr-nav-tier{border-left-color:var(--good)}
+@media(max-width:900px){ .mrr-nav{display:none} }
+
+/* The three MRR Movement cards get a colored top edge PLUS a tinted
+   toolbar strip (not just a thin line — a subtle line alone was still
+   easy to miss scrolling fast), so which section you're looking at is
+   identifiable at a glance instead of by reading. Same three colors as
+   the nav links above, so the nav doubles as a legend for them.
+   `main > .card` beats a bare `.mrr-card` on specificity (it sets its own
+   border shorthand), so these repeat that `main > .card` prefix to win. */
+main > .card.mrr-card{border-top:4px solid transparent}
+main > .card.mrr-card-bridge{border-top-color:var(--accent)}
+main > .card.mrr-card-bridge .toolbar{background:var(--accent-soft)}
+.mrr-card-bridge .toolbar b{color:var(--accent)}
+main > .card.mrr-card-product{border-top-color:var(--gold)}
+main > .card.mrr-card-product .toolbar{background:var(--gold-soft)}
+.mrr-card-product .toolbar b{color:var(--gold)}
+main > .card.mrr-card-tier{border-top-color:var(--good)}
+main > .card.mrr-card-tier .toolbar{background:var(--new-soft)}
+.mrr-card-tier .toolbar b{color:var(--good)}
+
 .load-more{display:flex;align-items:center;padding:9px 14px;
   font-size:11.5px;color:var(--ink-3);border-top:1px solid var(--border);background:var(--surface-2)}
 .load-more .lm-center{flex:1;display:flex;align-items:center;justify-content:center;gap:10px}
