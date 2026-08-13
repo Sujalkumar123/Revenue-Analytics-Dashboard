@@ -32,13 +32,15 @@ function classify(a, b) {
 var MOVE_LABEL = { new: "New", growth: "Growth", decline: "Decline", churned: "Churned", flat: "Flat" };
 /* Same order (and the same "Other modules has no Users column") as the
    source sheet's own column layout — it tracks Users for every product
-   except Other modules, which is revenue-only there too. */
+   except Other modules, which is revenue-only there too. Each gets its
+   own color so its Users+Revenue pair reads as one visual "batch" in the
+   header instead of two more columns in an undifferentiated wall of them. */
 var PRODUCTS = [
-  { key: "gt", label: "SFA GT", product: "GT subscription" },
-  { key: "dms", label: "DMS", product: "DMS subscription" },
-  { key: "flo", label: "Flo", product: "Flo subscription" },
-  { key: "mt", label: "SFA MT", product: "MT subscription" },
-  { key: "other", label: "Other modules", product: "Other modules", noUsers: true }
+  { key: "gt", label: "SFA GT", product: "GT subscription", color: "accent" },
+  { key: "dms", label: "DMS", product: "DMS subscription", color: "gold" },
+  { key: "flo", label: "Flo", product: "Flo subscription", color: "good" },
+  { key: "mt", label: "SFA MT", product: "MT subscription", color: "edit" },
+  { key: "other", label: "Other modules", product: "Other modules", noUsers: true, color: "ink3" }
 ];
 
 export function renderMrrMovement() {
@@ -248,9 +250,12 @@ export function renderMrrMovement() {
       return '<th class="num" style="width:90px">' + esc(m.label) + ' Users</th>' +
         '<th class="num" style="width:110px">' + esc(m.label) + ' Revenue</th>';
     }).join("") +
+    /* Each product's Users+Revenue pair shares one background tint (batch-*
+       below), so the two columns read as one group at a glance instead of
+       blending into the wall of numbers either side of them. */
     PRODUCTS.map(function (p) {
-      return (p.noUsers ? "" : '<th class="num" style="width:80px">' + esc(p.label) + ' Users</th>') +
-        '<th class="num" style="width:110px">' + esc(p.label) + ' Revenue</th>';
+      return (p.noUsers ? "" : '<th class="num batch-' + p.color + '" style="width:80px">' + esc(p.label) + ' Users</th>') +
+        '<th class="num batch-' + p.color + '" style="width:110px">' + esc(p.label) + ' Revenue</th>';
     }).join("") +
     "</tr></thead><tbody id=\"tb2\">";
   if (!rows.length) {
@@ -366,8 +371,9 @@ export function renderMrrMovement() {
               '<td class="num ' + (Math.abs(t.revenue) < 0.5 ? "zero" : "") + '">' + inr(t.revenue) + "</td>";
           }).join("") +
           r.prod.map(function (p, pi) {
-            return (PRODUCTS[pi].noUsers ? "" : '<td class="num ' + (p.users < 0.5 ? "zero" : "") + '">' + Math.round(p.users).toLocaleString("en-IN") + "</td>") +
-              '<td class="num ' + (p.revenue < 0.5 ? "zero" : "") + '">' + inr(p.revenue) + "</td>";
+            var pr = PRODUCTS[pi];
+            return (pr.noUsers ? "" : '<td class="num batch-' + pr.color + ' ' + (p.users < 0.5 ? "zero" : "") + '">' + Math.round(p.users).toLocaleString("en-IN") + "</td>") +
+              '<td class="num batch-' + pr.color + ' ' + (p.revenue < 0.5 ? "zero" : "") + '">' + inr(p.revenue) + "</td>";
           }).join("") +
           "</tr>";
       }
