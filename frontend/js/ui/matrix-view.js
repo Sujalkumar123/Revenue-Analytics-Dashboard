@@ -161,6 +161,21 @@ export function renderMatrix(opts) {
     kpiCard("Monthly average", inrShort(grand / (months.length || 1)), "across " + months.length + " months") +
     "</div>";
 
+  /* Grouped with toolbarControlsHTML's own tb-right cluster (right next to
+     the FY select) rather than sitting loose earlier in the toolbar — on a
+     narrow window the toolbar wraps by item, and a lone control stranded
+     mid-row is easy to lose track of; keeping it beside FY means the two
+     always wrap onto the same line together. */
+  var provSelHTML = opts.projectable
+    ? '<select id="provSel" title="Filter by projected-revenue status" class="prov-filter-sel' +
+      (state.provFilter !== "all" ? " active" : "") + '">' +
+      '<option value="all"' + (state.provFilter === "all" ? " selected" : "") + ">All clients</option>" +
+      '<option value="pending"' + (state.provFilter === "pending" ? " selected" : "") + ">⏳ Pending confirmation (" + pendingCount + ")</option>" +
+      '<option value="confirmed"' + (state.provFilter === "confirmed" ? " selected" : "") + ">✓ Confirmed actual (" + confirmedCount + ")</option>" +
+      '<option value="churned"' + (state.provFilter === "churned" ? " selected" : "") + ">✕ Marked churn (" + churnedCount + ")</option>" +
+      "</select>"
+    : "";
+
   html += '<div class="card">';
   html += '<div class="toolbar">' +
     '<input type="search" id="q" placeholder="Search client…" value="' + esc(state.search) + '" />' +
@@ -179,16 +194,7 @@ export function renderMatrix(opts) {
       ? (mxCount() ? '<button class="icon-btn" id="clrMx">Reset ' + mxCount() + " override(s)</button>" : "")
       : '<span class="badge-lock">🔒 ' + (opts.editable ? "Read-only access" : "Derived — read-only") + "</span>") +
     (vstate.filters.name ? '<button class="icon-btn" id="clrFilters">Clear filter</button>' : "") +
-    (opts.projectable
-      ? '<select id="provSel" title="Filter by projected-revenue status" class="prov-filter-sel' +
-        (state.provFilter !== "all" ? " active" : "") + '">' +
-        '<option value="all"' + (state.provFilter === "all" ? " selected" : "") + ">All clients</option>" +
-        '<option value="pending"' + (state.provFilter === "pending" ? " selected" : "") + ">⏳ Pending confirmation (" + pendingCount + ")</option>" +
-        '<option value="confirmed"' + (state.provFilter === "confirmed" ? " selected" : "") + ">✓ Confirmed actual (" + confirmedCount + ")</option>" +
-        '<option value="churned"' + (state.provFilter === "churned" ? " selected" : "") + ">✕ Marked churn (" + churnedCount + ")</option>" +
-        "</select>"
-      : "") +
-    toolbarControlsHTML({ noExport: true }) + "</div>";
+    toolbarControlsHTML({ noExport: true, extra: provSelHTML }) + "</div>";
 
   html += '<div class="grid-wrap" id="gw"><table class="grid"><thead>' +
     '<tr class="hdr-row"><th class="rownum" style="width:38px"></th>' +

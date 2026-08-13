@@ -16,6 +16,7 @@ export function kpiCard(k, v, s, cls) {
 export function toolbarControlsHTML(opts) {
   var noAdd = opts && opts.noAdd;
   var noExport = opts && opts.noExport;
+  var extra = (opts && opts.extra) || "";
   return '<span class="tb-right">' +
     /* Undo/redo isn't admin-only — filtering/sorting (also on the shared
        HISTORY stack) is something every role can do and undo. Only adding
@@ -30,6 +31,7 @@ export function toolbarControlsHTML(opts) {
        is only meaningful on the tabs that actually store an editable line:
        Invoice working, Credit Note Working, Recurring Revenue. */
     (canEdit() && !noAdd ? '<button class="btn-primary" id="addBtn" title="Add a new client line">+ Add client</button>' : "") +
+    extra +
     '<select id="fySel" title="Financial year">' +
     FYS.map(function (f) {
       return '<option value="' + f.id + '"' + (f.id === state.fy ? " selected" : "") + ">" + f.label + "</option>";
