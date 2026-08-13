@@ -9,7 +9,7 @@ import { aggregate, netAggregate, computeProvisional } from "../data/revenue.js"
 import { state, S, curFY } from "../state/app-state.js";
 import { canEdit } from "../state/auth.js";
 import { MXO, mxKey, mxCount } from "../state/stores.js";
-import { getProvStatus, setProvStatus, clearProvStatus } from "../state/recurring-status.js";
+import { getProvStatus, setProvStatus, clearProvStatus, isProvExpired } from "../state/recurring-status.js";
 import { HISTORY } from "../state/history.js";
 import { parseNum } from "../core/format.js";
 import { kpiCard, toolbarControlsHTML, wireSearchSort, MONTH_W } from "./toolbar.js";
@@ -89,7 +89,13 @@ export function renderMatrix(opts) {
         var projAmt = clientOverlay.get(months[pi].label);
         if (projAmt === undefined) continue;
         var st = getProvStatus(n, months[pi].label) || "pending";
-        if (months[pi].label === lastProvLabel) { prov[pi] = st; provAmt[pi] = projAmt; }
+        /* Confirmed/churned are a 2-real-month reminder, not a permanent
+           flag — past that window the border/buttons quietly retire (see
+           recurring-status.js) even though the underlying number doesn't
+           change: a still-churned month stays excluded, a confirmed one
+           keeps showing its figure, just without the colored border. */
+        var expired = st !== "pending" && isProvExpired(n, months[pi].label);
+        if (!expired && months[pi].label === lastProvLabel) { prov[pi] = st; provAmt[pi] = projAmt; }
         if (st === "churned") continue;   // stays zero — excluded from revenue
         g[pi] = projAmt;
         nt[pi] = projAmt;
