@@ -8,9 +8,15 @@ import { FYS } from "../core/dates.js";
 export var S = { consol: null, credit: null, dims: null, invoiceDump: null, creditNoteDump: null };
 export var readyFlag = { value: false };
 
-export var state = { tab: "recurr", fy: "2024-25", metric: "net", search: "", sort: "total_desc", flagOnly: false, provFilter: "all" };
+export var state = {
+  tab: "recurr", fy: "2024-25", metric: "net", search: "", sort: "total_desc", flagOnly: false, provFilter: "all",
+  /* MRR Movement's own two-month picker — null means "not chosen yet",
+     resolved to the two most recent months with data on first render. */
+  mrrA: null, mrrB: null, mrrMoveFilter: "all"
+};
 
 export var TABS = [
+  { id: "mrr",            label: "MRR Movement" },
   { id: "recurr",        label: "Recurring Revenue" },
   { id: "consol",        label: "Invoice working" },
   { id: "invoice",       label: "Invoice Dump" },

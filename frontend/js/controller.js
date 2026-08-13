@@ -11,6 +11,7 @@ import { renderMatrix } from "./ui/matrix-view.js";
 import { renderLedger } from "./ui/ledger-view.js";
 import { renderInvoiceDump } from "./ui/invoice-dump-view.js";
 import { renderCreditNoteDump } from "./ui/credit-note-dump-view.js";
+import { renderMrrMovement } from "./ui/mrr-movement-view.js";
 import { LEDGER_COLS, CREDIT_COLS } from "./ui/toolbar.js";
 import { SEL } from "./ui/selection.js";
 
@@ -20,7 +21,9 @@ export function render(keepFocus) {
   var selStart = focusId === "q" ? document.activeElement.selectionStart : null;
   SEL.clear();
 
-  if (state.tab === "recurr") {
+  if (state.tab === "mrr") {
+    renderMrrMovement();
+  } else if (state.tab === "recurr") {
     renderMatrix({ title: "Recurring Revenue by Client", filter: onlyRecurring, netable: true, editable: true, projectable: true });
   } else if (state.tab === "onetime") {
     renderMatrix({ title: "One-time Charges (OTC) by Client", filter: onlyOneTime, netable: false });
