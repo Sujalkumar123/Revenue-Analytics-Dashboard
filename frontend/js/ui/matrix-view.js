@@ -74,6 +74,12 @@ export function renderMatrix(opts) {
        — a client that's gone 8 months without an invoice doesn't need 8
        identical flagged cells, just the one that's actually new/undecided. */
     var prov = [];
+    /* The projected amount for the one actionable cell, stashed by month
+       index — needed because a churned cell's own vals[] entry is 0 (the
+       point of churning), so patchProvCell() below has nowhere else to
+       recover "what it would be if un-churned" without recomputing the
+       whole overlay on every click. */
+    var provAmt = [];
     var clientOverlay = overlay.get(n);
     if (clientOverlay) {
       var lastProvLabel = null;
@@ -83,7 +89,7 @@ export function renderMatrix(opts) {
         var projAmt = clientOverlay.get(months[pi].label);
         if (projAmt === undefined) continue;
         var st = getProvStatus(n, months[pi].label) || "pending";
-        if (months[pi].label === lastProvLabel) prov[pi] = st;
+        if (months[pi].label === lastProvLabel) { prov[pi] = st; provAmt[pi] = projAmt; }
         if (st === "churned") continue;   // stays zero — excluded from revenue
         g[pi] = projAmt;
         nt[pi] = projAmt;
@@ -102,7 +108,7 @@ export function renderMatrix(opts) {
        the month total, the FY total and the KPI cards */
     var tot = vals.reduce(function (a, b) { return a + b; }, 0);
     if (Math.abs(tot) < 0.5 && !vals.some(function (v) { return Math.abs(v) >= 0.5; }) && !ov.length && !prov.length) return;
-    rows.push({ name: n, vals: vals, total: tot, ov: ov, prov: prov });
+    rows.push({ name: n, vals: vals, total: tot, ov: ov, prov: prov, provAmt: provAmt });
   });
 
   var term = state.search.trim().toLowerCase();
@@ -237,7 +243,8 @@ export function renderMatrix(opts) {
               (cellEditable ? ' data-mx="1" data-client="' + esc(r.name) +
                 '" data-month="' + esc(months[mi].label) + '" data-orig="' + esc(disp) +
                 '" title="Double-click to type a figure and override this month for this client — marked A for admin-edited"' : "") +
-              (provInteractive ? ' data-prov="1" data-prov-status="' + provSt + '" data-prov-client="' + esc(r.name) + '" data-prov-month="' + esc(months[mi].label) + '"' : "") +
+              (provInteractive ? ' data-prov="1" data-prov-status="' + provSt + '" data-prov-client="' + esc(r.name) +
+                '" data-prov-month="' + esc(months[mi].label) + '" data-prov-amount="' + r.provAmt[mi] + '"' : "") +
               ">" + disp + provBadge + "</td>";
           }).join("") +
           '<td data-sel="1" class="num" data-v="' + (Math.round(r.total * 100) / 100) + '"><b>' + inr(r.total) + "</b></td></tr>";
@@ -253,6 +260,106 @@ export function renderMatrix(opts) {
     tbAll.addEventListener("mousedown", function (e) {
       if (e.target && e.target.closest && e.target.closest(".prov-btn")) e.stopPropagation();
     });
+
+    /* Confirm/Reject/Undo patch the DOM in place instead of calling the
+       normal render() — a full render replaces the whole grid, which resets
+       infinite-scroll back to the first 150 rows and loses wherever the
+       admin had scrolled to. Only the one cell, its row's FY Total, that
+       month's column total, the grand total and the KPI cards actually
+       change, so only those get touched. History (and therefore Ctrl+Z)
+       still works the normal way — a global undo just isn't cell-scoped,
+       so it falls back to a full render(), which is fine since that's an
+       explicit, occasional action rather than every single click. */
+    function patchProvCell(td, client, monthLabel, action) {
+      var mi = -1;
+      for (var mj = 0; mj < months.length; mj++) if (months[mj].label === monthLabel) { mi = mj; break; }
+      var row = null;
+      for (var ri = 0; ri < rows.length; ri++) if (rows[ri].name === client) { row = rows[ri]; break; }
+      if (mi === -1 || !row || state.provFilter !== "all") { render(); return; }   // filtered view may need a row removed — safest to fall back
+
+      var amt = parseFloat(td.getAttribute("data-prov-amount")) || 0;
+      var newStatus = action || "pending";
+      var newVal = newStatus === "churned" ? 0 : amt;
+      var delta = newVal - row.vals[mi];
+
+      row.vals[mi] = newVal;
+      row.total += delta;
+      row.prov[mi] = newStatus;
+      colTot[mi] += delta;
+      grand += delta;
+
+      var disp = inr(newVal);
+      var provInteractive = newStatus === "pending" || newStatus === "churned";
+      var provClass = newStatus === "churned" ? "prov-churned" : newStatus === "confirmed" ? "prov-confirmed" : "prov-pending";
+      td.className = "num " + (Math.abs(newVal) < 0.5 ? "zero " : newVal < 0 ? "neg " : "") +
+        (editable && !provInteractive ? "editable " : "") + provClass;
+      td.setAttribute("data-v", Math.round(newVal * 100) / 100);
+      if (provInteractive) {
+        td.setAttribute("data-prov-status", newStatus);
+        td.setAttribute("data-prov", "1");
+        td.setAttribute("data-prov-client", client);
+        td.setAttribute("data-prov-month", monthLabel);
+        td.setAttribute("data-prov-amount", amt);
+        td.removeAttribute("data-mx");
+      } else {
+        td.removeAttribute("data-prov-status");
+        td.removeAttribute("data-prov");
+        /* now confirmed → behaves like any other editable cell */
+        if (editable) {
+          td.setAttribute("data-mx", "1");
+          td.setAttribute("data-client", client);
+          td.setAttribute("data-month", monthLabel);
+          td.setAttribute("data-orig", disp);
+          td.setAttribute("title", "Double-click to type a figure and override this month for this client — marked A for admin-edited");
+        }
+      }
+      var badge = "";
+      if (newStatus === "pending") {
+        badge = editable
+          ? '<span class="prov-actions"><button type="button" class="prov-btn prov-confirm" title="Confirm as actual">✓</button><button type="button" class="prov-btn prov-reject" title="Mark as churn">✕</button></span>'
+          : '<span class="prov-badge" title="Projected — no invoice yet">Projected</span>';
+      } else if (newStatus === "churned") {
+        badge = editable
+          ? '<span class="prov-actions"><button type="button" class="prov-btn prov-undo" title="Undo — revert to pending">↺ Undo</button></span>'
+          : '<span class="prov-badge prov-badge-churned" title="Marked churned — excluded from revenue">Churned</span>';
+      }
+      td.innerHTML = disp + badge;
+
+      var rowTotalTd = td.parentElement.lastElementChild;
+      rowTotalTd.setAttribute("data-v", Math.round(row.total * 100) / 100);
+      rowTotalTd.innerHTML = "<b>" + inr(row.total) + "</b>";
+
+      var totalCells = view.querySelectorAll("thead tr.total-row th.num");
+      if (totalCells[mi]) totalCells[mi].textContent = inr(colTot[mi]);
+      if (totalCells.length) totalCells[totalCells.length - 1].textContent = inr(grand);
+
+      var kpiEls = view.querySelectorAll(".kpis .kpi");
+      if (kpiEls[0]) { var v0 = kpiEls[0].querySelector(".v"); if (v0) v0.textContent = inrShort(grand); }
+      var newPeak = colTot.indexOf(Math.max.apply(null, colTot));
+      if (kpiEls[2]) {
+        var v2 = kpiEls[2].querySelector(".v"), s2 = kpiEls[2].querySelector(".s");
+        if (v2) v2.textContent = months[newPeak] ? months[newPeak].label : "–";
+        if (s2) s2.textContent = months[newPeak] ? inrShort(colTot[newPeak]) : "";
+      }
+      if (kpiEls[3]) { var v3 = kpiEls[3].querySelector(".v"); if (v3) v3.textContent = inrShort(grand / (months.length || 1)); }
+
+      var provSelEl = view.querySelector("#provSel");
+      if (provSelEl) {
+        provSelEl.options[1].textContent = "⏳ Pending confirmation (" + rows.filter(hasProv("pending")).length + ")";
+        provSelEl.options[2].textContent = "✓ Confirmed actual (" + rows.filter(hasProv("confirmed")).length + ")";
+        provSelEl.options[3].textContent = "✕ Marked churn (" + rows.filter(hasProv("churned")).length + ")";
+      }
+
+      /* The click itself just pushed onto HISTORY — the toolbar's Undo/Redo
+         buttons render their disabled state from HISTORY at render() time,
+         which this patch deliberately skips, so update them directly.
+         Ctrl+Z isn't affected either way (it calls runUndo() straight from
+         the keyboard handler, not through this button). */
+      var undoBtn = view.querySelector("#undoBtn"), redoBtn = view.querySelector("#redoBtn");
+      if (undoBtn) undoBtn.disabled = !HISTORY.canUndo();
+      if (redoBtn) redoBtn.disabled = !HISTORY.canRedo();
+    }
+
     tbAll.addEventListener("click", function (e) {
       var btn = e.target && e.target.closest ? e.target.closest(".prov-btn") : null;
       if (!btn) return;
@@ -269,7 +376,7 @@ export function renderMatrix(opts) {
         apply: function () { if (action) setProvStatus(client, monthLabel, action); else clearProvStatus(client, monthLabel); },
         revert: function () { if (prevStatus) setProvStatus(client, monthLabel, prevStatus); else clearProvStatus(client, monthLabel); }
       });
-      render();
+      patchProvCell(td, client, monthLabel, action);
     });
 
     if (editable) {
