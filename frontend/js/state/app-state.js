@@ -5,7 +5,7 @@
 
 import { FYS } from "../core/dates.js";
 
-export var S = { consol: null, credit: null, dims: null, invoiceDump: null, creditNoteDump: null };
+export var S = { consol: null, credit: null, dims: null, invoiceDump: null, creditNoteDump: null, mrrSeed: null };
 export var readyFlag = { value: false };
 
 var TAB_IDS = ["mrr", "recurr", "consol", "invoice", "creditworking", "credit", "onetime"];

@@ -357,6 +357,8 @@ tr:hover .prov-actions,td.prov-pending:focus-within .prov-actions,td.prov-churne
 .mv-flat{background:var(--surface-2);color:var(--ink-3)}
 .remark-cell{color:var(--ink-2)}
 .remark-cell:empty::before{content:"— click to add —";color:var(--ink-3);font-style:italic}
+.accruals-cell{color:var(--ink-2)}
+.accruals-cell:empty::before{content:"— click to add —";color:var(--ink-3);font-style:italic}
 
 td.sel{background:var(--sel)!important}
 /* per-range borders are set as an inline box-shadow in JS (combining however

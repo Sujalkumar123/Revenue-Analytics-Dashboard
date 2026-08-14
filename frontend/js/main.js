@@ -157,7 +157,8 @@ function loadFrom(base) {
     fetchJSON(base, "creditnotes.json"),
     fetchJSON(base, "clientdims.json").catch(function () { return {}; }),
     fetchJSON(base, "invoicedump.json").catch(function () { return { cols: [], rows: [] }; }),
-    fetchJSON(base, "creditnotedump.json").catch(function () { return { cols: [], rows: [] }; })
+    fetchJSON(base, "creditnotedump.json").catch(function () { return { cols: [], rows: [] }; }),
+    fetchJSON(base, "mrr-accruals-seed.json").catch(function () { return {}; })
   ]);
 }
 
@@ -168,7 +169,7 @@ function loadData() {
       return loadFrom("sample-data");
     })
     .then(function (res) {
-      S.consol = res[0]; S.credit = res[1]; S.dims = res[2]; S.invoiceDump = res[3]; S.creditNoteDump = res[4];
+      S.consol = res[0]; S.credit = res[1]; S.dims = res[2]; S.invoiceDump = res[3]; S.creditNoteDump = res[4]; S.mrrSeed = res[5];
       applyAdds("consol", S.consol);
       applyAdds("credit", S.credit);
       readyFlag.value = true;

@@ -3,9 +3,15 @@
    them, sorted by biggest movers first. Built from the same live ledger
    every other tab uses (aggregate() over onlyRecurring rows) rather than
    a frozen import, so it never drifts from Recurring Revenue's own
-   numbers — the only genuinely new data here is the per-client Tier
-   classification and Remarks, neither of which exists anywhere else in
-   the ledger, so those are the only two editable things on this tab. */
+   numbers. The only editable things on this tab are the manual/
+   qualitative columns that don't exist anywhere else in the ledger —
+   Tier, Churn, Accruals check and Remarks — each seeded from the MRR
+   reconciliation sheet's own Category/Queries/Accruals-check columns
+   (clientdims.json + mrr-accruals-seed.json) where available, with any
+   admin edit here always overriding that seed. Every number (Revenue,
+   Users, and the Difference block, which is just a live formula off
+   whichever two months are picked) stays computed straight from the
+   ledger — nothing in that half of the grid is a manual override. */
 "use strict";
 
 import { fyMonths } from "../core/dates.js";
@@ -15,6 +21,8 @@ import { state, S } from "../state/app-state.js";
 import { canEdit } from "../state/auth.js";
 import { getTier, setTier, TIERS } from "../state/client-tier.js";
 import { getRemark, setRemark } from "../state/mrr-remarks.js";
+import { getAccruals, setAccruals } from "../state/mrr-accruals.js";
+import { getChurn, setChurn } from "../state/mrr-churn.js";
 import { getProvStatus } from "../state/recurring-status.js";
 import { HISTORY } from "../state/history.js";
 import { kpiCard, wireSearchSort } from "./toolbar.js";
@@ -89,7 +97,10 @@ export function renderMrrMovement() {
   gross.forEach(function (arr, client) {
     var a = resolved(client, arr, idxA), b = resolved(client, arr, idxB);
     if (Math.abs(a) < 0.5 && Math.abs(b) < 0.5) return;
-    rows.push({ name: client, a: a, b: b, delta: b - a, move: classify(a, b), tier: getTier(client), remark: getRemark(client) });
+    rows.push({
+      name: client, a: a, b: b, delta: b - a, move: classify(a, b), tier: getTier(client), remark: getRemark(client),
+      accruals: getAccruals(client), churn: getChurn(client)
+    });
   });
 
   var term = state.search.trim().toLowerCase();
@@ -150,21 +161,28 @@ export function renderMrrMovement() {
      (index 2 - index 1) — same "how much did it move since last time"
      question the Bridge table answers for the Total figure, asked again
      here for every product so it doesn't have to be worked out by eye
-     from the three raw numbers next to it. */
-  function diffOf(series) { return { revenue: series[2].revenue - series[1].revenue, users: series[2].users - series[1].users }; }
+     from the three raw numbers next to it. A client marked Churned whose
+     latest month is already at zero is fully accounted for — showing a
+     fresh negative Difference every time the window shifts just re-flags
+     the same churn as new decline, so that case reports flat 0 instead. */
+  function diffOf(series, flatZero) {
+    if (flatZero) return { revenue: 0, users: 0 };
+    return { revenue: series[2].revenue - series[1].revenue, users: series[2].users - series[1].users };
+  }
   rows.forEach(function (r) {
     var garr = gross.get(r.name), uarr = usersAll.get(r.name);
     r.trend = trendIdx.map(function (idx) {
       return { users: uarr ? (uarr[idx] || 0) : 0, revenue: garr ? resolved(r.name, garr, idx) : 0 };
     });
-    r.trendDiff = diffOf(r.trend);
+    var flatZero = r.churn && Math.abs(r.trend[2].revenue) < 0.5;
+    r.trendDiff = diffOf(r.trend, flatZero);
     r.prod = prodMaps.map(function (pm) {
       var g = pm.gross.get(r.name), u = pm.users.get(r.name);
       return trendIdx.map(function (idx) {
         return { revenue: g ? (g[idx] || 0) : 0, users: u ? (u[idx] || 0) : 0 };
       });
     });
-    r.prodDiff = r.prod.map(diffOf);
+    r.prodDiff = r.prod.map(function (series) { return diffOf(series, flatZero); });
   });
 
   /* Third section: the Summary sheet's own view — MRR, Users and ARPU
@@ -237,21 +255,23 @@ export function renderMrrMovement() {
     '<select id="monthBSel" title="Compare to">' +
     months.map(function (m) { return '<option value="' + esc(m.label) + '"' + (m.label === monthB.label ? " selected" : "") + ">" + m.label + "</option>"; }).join("") +
     "</select>" +
-    (editable ? "" : '<span class="badge-lock">🔒 Read-only — tier and remarks are admin-editable</span>') +
+    (editable ? "" : '<span class="badge-lock">🔒 Read-only — tier, churn, accruals check and remarks are admin-editable</span>') +
     "</span></div>";
 
   html += '<div class="grid-wrap" id="gw"><table class="grid"><thead><tr class="hdr-row">' +
     '<th class="rownum" style="width:38px"></th>' +
     '<th class="lbl sticky-l" style="width:270px">Client</th>' +
     '<th class="lbl" style="width:130px">Tier</th>' +
+    '<th class="lbl" style="width:70px" title="Fully churned account">Churn</th>' +
     '<th class="num" style="width:130px">' + esc(monthA.label) + "</th>" +
     '<th class="num" style="width:130px">' + esc(monthB.label) + "</th>" +
     '<th class="num" style="width:130px">Δ</th>' +
     '<th class="lbl" style="width:100px">Movement</th>' +
+    '<th class="lbl" style="width:200px">Accruals check</th>' +
     '<th class="lbl" style="width:280px">Remarks</th></tr></thead><tbody id="tb">';
 
   if (!rows.length) {
-    html += '<tr><td colspan="8" style="padding:26px;text-align:center;color:var(--ink-3)">No matching clients.</td></tr>';
+    html += '<tr><td colspan="10" style="padding:26px;text-align:center;color:var(--ink-3)">No matching clients.</td></tr>';
   }
   html += '</tbody></table><div class="sentinel" aria-hidden="true"></div></div>' +
     (rows.length ? loadMoreHTML(rows.length, true) : "") + "</div>";
@@ -358,10 +378,16 @@ export function renderMrrMovement() {
           '<td class="lbl">' + (editable
             ? '<select class="tier-sel" data-client="' + esc(r.name) + '">' + tierOptionsHTML(r.tier) + "</select>"
             : (esc(r.tier) || '<span style="color:var(--ink-3)">–</span>')) + "</td>" +
+          '<td class="lbl" style="text-align:center">' + (editable
+            ? '<input type="checkbox" class="churn-cb" data-client="' + esc(r.name) + '"' + (r.churn ? " checked" : "") + " />"
+            : (r.churn ? '<span class="mv-badge mv-churned">Churn</span>' : "")) + "</td>" +
           '<td class="num">' + inr(r.a) + "</td>" +
           '<td class="num">' + inr(r.b) + "</td>" +
           '<td class="num ' + (r.delta > 0.5 ? "" : r.delta < -0.5 ? "neg" : "zero") + '">' + (r.delta > 0.5 ? "+" : "") + inr(r.delta) + "</td>" +
           '<td><span class="mv-badge mv-' + r.move + '">' + MOVE_LABEL[r.move] + "</span></td>" +
+          '<td class="' + (editable ? "editable accruals-cell" : "") + '"' +
+          (editable ? ' data-client="' + esc(r.name) + '" data-orig="' + esc(r.accruals) + '" title="Double-click to edit"' : "") +
+          ">" + esc(r.accruals) + "</td>" +
           '<td class="' + (editable ? "editable remark-cell" : "") + '"' +
           (editable ? ' data-client="' + esc(r.name) + '" data-orig="' + esc(r.remark) + '" title="Double-click to add a note"' : "") +
           ">" + esc(r.remark) + "</td></tr>";
@@ -374,42 +400,60 @@ export function renderMrrMovement() {
     if (editable) {
       tbEl.addEventListener("change", function (e) {
         var sel = e.target.closest ? e.target.closest(".tier-sel") : null;
-        if (!sel) return;
-        var client = sel.getAttribute("data-client"), next = sel.value;
-        var prev = getTier(client);
-        HISTORY.perform({
-          label: "set tier for " + client,
-          apply: function () { setTier(client, next); },
-          revert: function () { setTier(client, prev); }
-        });
-        render();
+        if (sel) {
+          var client = sel.getAttribute("data-client"), next = sel.value;
+          var prev = getTier(client);
+          HISTORY.perform({
+            label: "set tier for " + client,
+            apply: function () { setTier(client, next); },
+            revert: function () { setTier(client, prev); }
+          });
+          render();
+          return;
+        }
+        var cb = e.target.closest ? e.target.closest(".churn-cb") : null;
+        if (cb) {
+          var cClient = cb.getAttribute("data-client"), nextOn = cb.checked;
+          var prevOn = getChurn(cClient);
+          HISTORY.perform({
+            label: (nextOn ? "mark churn for " : "unmark churn for ") + cClient,
+            apply: function () { setChurn(cClient, nextOn); },
+            revert: function () { setChurn(cClient, prevOn); }
+          });
+          render();
+        }
       });
 
-      var commitRemark = function (td) {
+      var commitEditable = function (td, getFn, setFn, label) {
         stopEditingCell(td);
         var nv = td.textContent.trim();
         var orig = (td.getAttribute("data-orig") || "").trim();
         if (nv === orig) return;
         var client = td.getAttribute("data-client");
-        var prev = getRemark(client);
+        var prev = getFn(client);
         HISTORY.perform({
-          label: "set remark for " + client,
-          apply: function () { setRemark(client, nv); },
-          revert: function () { setRemark(client, prev); }
+          label: label + " for " + client,
+          apply: function () { setFn(client, nv); },
+          revert: function () { setFn(client, prev); }
         });
         render();
       };
+      var commitRemark = function (td) { commitEditable(td, getRemark, setRemark, "set remark"); };
+      var commitAccruals = function (td) { commitEditable(td, getAccruals, setAccruals, "set accruals check"); };
+      var editableCellSel = "td.remark-cell, td.accruals-cell";
       tbEl.addEventListener("focusout", function (e) {
-        var td = e.target && e.target.closest ? e.target.closest("td.remark-cell") : null;
-        if (td) commitRemark(td);
+        var td = e.target && e.target.closest ? e.target.closest(editableCellSel) : null;
+        if (!td) return;
+        if (td.classList.contains("remark-cell")) commitRemark(td); else commitAccruals(td);
       });
       tbEl.addEventListener("keydown", function (e) {
-        var td = e.target && e.target.closest ? e.target.closest("td.remark-cell") : null;
+        var td = e.target && e.target.closest ? e.target.closest(editableCellSel) : null;
         if (!td) return;
-        if (e.key === "Enter") { e.preventDefault(); commitRemark(td); td.blur(); }
+        var commit = td.classList.contains("remark-cell") ? commitRemark : commitAccruals;
+        if (e.key === "Enter") { e.preventDefault(); commit(td); td.blur(); }
         if (e.key === "Escape") { td.textContent = td.getAttribute("data-orig") || ""; stopEditingCell(td); td.blur(); }
       });
-      attachDblClickEdit(tbEl, "td.remark-cell");
+      attachDblClickEdit(tbEl, editableCellSel);
     }
 
     attachInfinite(view.querySelector("#gw2"), view.querySelector("#tb2"), rows.length, function (from, to) {
@@ -478,10 +522,10 @@ export function renderMrrMovement() {
   }
 
   window.__csv = function () {
-    var lines = [["Client", "Tier", monthA.label, monthB.label, "Delta", "Movement", "Remarks"].join(",")];
+    var lines = [["Client", "Tier", "Churn", monthA.label, monthB.label, "Delta", "Movement", "Accruals check", "Remarks"].join(",")];
     rows.forEach(function (r) {
-      lines.push(['"' + r.name.replace(/"/g, '""') + '"', r.tier, Math.round(r.a), Math.round(r.b), Math.round(r.delta),
-        MOVE_LABEL[r.move], '"' + r.remark.replace(/"/g, '""') + '"'].join(","));
+      lines.push(['"' + r.name.replace(/"/g, '""') + '"', r.tier, r.churn ? "Churn" : "", Math.round(r.a), Math.round(r.b), Math.round(r.delta),
+        MOVE_LABEL[r.move], '"' + r.accruals.replace(/"/g, '""') + '"', '"' + r.remark.replace(/"/g, '""') + '"'].join(","));
     });
     return { name: "MRR_Movement_" + monthA.label + "_to_" + monthB.label + ".csv", body: lines.join("\n") };
   };
