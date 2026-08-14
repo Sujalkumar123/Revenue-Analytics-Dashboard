@@ -8,6 +8,7 @@
 
 # Backend — real secrets, synced ledger cache, local user accounts
 backend/.env
+backend/.env.txt
 backend/data/
 __pycache__/
 *.pyc
