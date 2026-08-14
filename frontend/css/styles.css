@@ -472,6 +472,15 @@ tbody tr:nth-child(even) td.batch-ink3{background:color-mix(in srgb, var(--surfa
    size is what makes the group name the thing read first. */
 table.grid thead tr.hdr-row.hdr-batch-row th{text-align:center;font-size:11.5px;font-weight:700}
 table.grid thead tr.hdr-row.hdr-batch-row th.hdr-batch-total{background:var(--surface-2);color:var(--ink-2)}
+/* The month label spans its own Revenue+Users pair below it — centering
+   it over that pair (rather than the base right-align every leaf column
+   uses) is what makes the grouping readable at a glance. */
+table.grid thead tr.hdr-row.hdr-monthrow th{text-align:center}
+/* A full light grid — thin vertical rules between every column, on top of
+   the existing row rules — reads as one spreadsheet-like grid instead of
+   numbers separated only by whitespace. */
+#gw2 table.grid th,#gw2 table.grid td{border-right:1px solid var(--border-soft)}
+#gw2 table.grid th:last-child,#gw2 table.grid td:last-child{border-right:none}
 /* A thin vertical rule at every group boundary — enough to separate groups
    without the heavy 2px rule of the old ribbon design. */
 .grp-edge{border-left:1px solid var(--border)}
