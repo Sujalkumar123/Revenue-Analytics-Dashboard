@@ -21,7 +21,11 @@ export var state = {
   tab: lastTab(), fy: "2024-25", metric: "net", search: "", sort: "total_desc", flagOnly: false, provFilter: "all",
   /* MRR Movement's own two-month picker — null means "not chosen yet",
      resolved to the two most recent months with data on first render. */
-  mrrA: null, mrrB: null, mrrMoveFilter: "all", mrrTierMetric: "mrr"
+  mrrA: null, mrrB: null, mrrMoveFilter: "all", mrrTierMetric: "mrr",
+  /* Product breakdown's own 3-month trend picker — null means "not chosen
+     yet", each defaults to trailing off Bridge's Month B (Month B and the
+     two months before it) until the admin picks something else. */
+  mrrTrend1: null, mrrTrend2: null, mrrTrend3: null
 };
 
 export var TABS = [

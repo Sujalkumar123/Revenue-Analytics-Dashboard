@@ -113,6 +113,17 @@ export function renderMrrMovement() {
      nonzero. Reuses the exact same (already filtered) client list as the
      bridge above, so the two sections never disagree about who's in view. */
   var trendIdx = [Math.max(0, idxB - 2), Math.max(0, idxB - 1), idxB];
+  /* Each of the 3 trended months (and therefore the Difference block,
+     which is just index 2 minus index 1) can be repointed independently
+     via its own dropdown — picking Jan-26 for the last slot recomputes
+     Total, every product's Revenue+Users, and the Difference column for
+     that new pair, all in one render since everything downstream reads
+     trendIdx/trendMonths rather than idxB directly. */
+  [state.mrrTrend1, state.mrrTrend2, state.mrrTrend3].forEach(function (v, i) {
+    if (!v) return;
+    var fi = months.findIndex(function (m) { return m.label === v; });
+    if (fi !== -1) trendIdx[i] = fi;
+  });
   var trendMonths = trendIdx.map(function (i) { return months[i]; });
   var prodMaps = PRODUCTS.map(function (p) {
     return { gross: aggregate(S.consol, "consol", months, recurringProduct(p.product)), users: aggregateUsers(S.consol, "consol", months, recurringProduct(p.product)) };
@@ -261,10 +272,19 @@ export function renderMrrMovement() {
   GROUPS.forEach(function (g) {
     for (var bi = 0; bi < blocksPerGroup; bi++) { leafCols.push({ w: 110 }); if (!g.noUsers) leafCols.push({ w: 80 }); }
   });
+  function monthOptionsHTML(sel) {
+    return months.map(function (m) { return '<option value="' + esc(m.label) + '"' + (m.label === sel ? " selected" : "") + ">" + m.label + "</option>"; }).join("");
+  }
   html += '<div class="card mrr-card mrr-card-product" id="mrrProduct"><div class="toolbar"><b style="font-size:13px">Product breakdown</b>' +
     '<input type="search" id="q2" placeholder="Search client…" value="' + esc(state.search) + '" />' +
-    '<span style="color:var(--ink-3);font-size:12px">Revenue + Users, ' + esc(trendMonths[0].label) + ' → ' + esc(trendMonths[2].label) +
-    ' · Difference = ' + esc(trendMonths[2].label) + ' vs ' + esc(trendMonths[1].label) + '</span></div>';
+    '<span class="tb-right" style="display:flex;align-items:center;gap:6px">' +
+    '<select id="trendSel0" title="First trended month">' + monthOptionsHTML(trendMonths[0].label) + "</select>" +
+    '<span style="color:var(--ink-3);font-size:12.5px">→</span>' +
+    '<select id="trendSel1" title="Second trended month">' + monthOptionsHTML(trendMonths[1].label) + "</select>" +
+    '<span style="color:var(--ink-3);font-size:12.5px">→</span>' +
+    '<select id="trendSel2" title="Third trended month">' + monthOptionsHTML(trendMonths[2].label) + "</select>" +
+    '<span style="color:var(--ink-3);font-size:12px">Difference = ' + esc(trendMonths[2].label) + ' vs ' + esc(trendMonths[1].label) + '</span>' +
+    "</span></div>";
   html += '<div class="grid-wrap" id="gw2"><table class="grid">' +
     "<colgroup>" + leafCols.map(function (c) { return '<col style="width:' + c.w + 'px">'; }).join("") + "</colgroup>" +
     '<thead><tr class="hdr-row hdr-batch-row">' +
@@ -429,6 +449,10 @@ export function renderMrrMovement() {
   var mA = view.querySelector("#monthASel"), mB = view.querySelector("#monthBSel");
   if (mA) mA.addEventListener("change", function () { state.mrrA = mA.value; render(); });
   if (mB) mB.addEventListener("change", function () { state.mrrB = mB.value; render(); });
+  var tSel0 = view.querySelector("#trendSel0"), tSel1 = view.querySelector("#trendSel1"), tSel2 = view.querySelector("#trendSel2");
+  if (tSel0) tSel0.addEventListener("change", function () { state.mrrTrend1 = tSel0.value; render(); });
+  if (tSel1) tSel1.addEventListener("change", function () { state.mrrTrend2 = tSel1.value; render(); });
+  if (tSel2) tSel2.addEventListener("change", function () { state.mrrTrend3 = tSel2.value; render(); });
   view.querySelectorAll("[data-tiermetric]").forEach(function (b) {
     b.addEventListener("click", function () { state.mrrTierMetric = b.getAttribute("data-tiermetric"); render(); });
   });
