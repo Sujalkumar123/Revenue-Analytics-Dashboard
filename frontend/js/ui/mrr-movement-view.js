@@ -135,17 +135,25 @@ export function renderMrrMovement() {
       for (var m = 0; m < months.length; m++) acc[m] += arr[m];
     });
   });
+  /* Diff = last month minus second-last month of the 3-month trend window
+     (index 2 - index 1) — same "how much did it move since last time"
+     question the Bridge table answers for the Total figure, asked again
+     here for every product so it doesn't have to be worked out by eye
+     from the three raw numbers next to it. */
+  function diffOf(series) { return { revenue: series[2].revenue - series[1].revenue, users: series[2].users - series[1].users }; }
   rows.forEach(function (r) {
     var garr = gross.get(r.name), uarr = usersAll.get(r.name);
     r.trend = trendIdx.map(function (idx) {
       return { users: uarr ? (uarr[idx] || 0) : 0, revenue: garr ? resolved(r.name, garr, idx) : 0 };
     });
+    r.trendDiff = diffOf(r.trend);
     r.prod = prodMaps.map(function (pm) {
       var g = pm.gross.get(r.name), u = pm.users.get(r.name);
       return trendIdx.map(function (idx) {
         return { revenue: g ? (g[idx] || 0) : 0, users: u ? (u[idx] || 0) : 0 };
       });
     });
+    r.prodDiff = r.prod.map(diffOf);
   });
 
   /* Third section: the Summary sheet's own view — MRR, Users and ARPU
@@ -237,61 +245,53 @@ export function renderMrrMovement() {
   html += '</tbody></table><div class="sentinel" aria-hidden="true"></div></div>' +
     (rows.length ? loadMoreHTML(rows.length, true) : "") + "</div>";
 
-  /* Section 2: 3-month trend of Total Users + Revenue, plus product-level
-     detail gated behind a dropdown instead of all five products' full
-     trends laid out side by side — the original all-columns-at-once
-     version hit 35 columns wide, which was more "scroll forever" than
-     "identify instantly." Default ("All products") shows one compact
-     key-value cell per product — revenue + user count together, latest
-     month only. Picking a specific product swaps that whole row of
-     summaries for just that one product's full 3-month trend (matching
-     Total's own layout), so the detail is there when wanted without
-     forcing everyone to pay for it by default. */
-  var focusedProducts = state.mrrProductFocus === "all" ? PRODUCTS : PRODUCTS.filter(function (p) { return p.key === state.mrrProductFocus; });
-  var focusedIsAll = state.mrrProductFocus === "all";
-  var prodColCount = focusedIsAll ? PRODUCTS.length : focusedProducts.reduce(function (n, p) { return n + (p.noUsers ? 1 : 2) * trendMonths.length; }, 0);
+  /* Section 2: the full grid, exactly as the source sheet laid it out —
+     one group per block (Total, then each product), each block showing
+     Revenue+Users for the 3 trended months PLUS a Difference block (last
+     month minus second-last), all under one 3-row header: group name →
+     month (or "Difference") → Revenue/Users. Two earlier attempts at
+     narrowing this down (a flat wall of columns, then a dropdown-gated
+     summary) both missed the point — the owner wants the complete grid,
+     just organized clearly, not summarized away. */
+  var GROUPS = [{ key: "total", label: "Total revenue & user counts", color: "totalgrp", noUsers: false }].concat(PRODUCTS);
+  function seriesFor(r, g) { return g.key === "total" ? r.trend : r.prod[PRODUCTS.indexOf(g)]; }
+  function diffFor(r, g) { return g.key === "total" ? r.trendDiff : r.prodDiff[PRODUCTS.indexOf(g)]; }
+  var blocksPerGroup = trendMonths.length + 1;   // 3 months + 1 Difference block
   var leafCols = [{ w: 38 }, { w: 270 }];
-  trendMonths.forEach(function () { leafCols.push({ w: 90 }, { w: 110 }); });
-  if (focusedIsAll) {
-    PRODUCTS.forEach(function () { leafCols.push({ w: 160 }); });
-  } else {
-    focusedProducts.forEach(function (p) {
-      trendMonths.forEach(function () { if (!p.noUsers) leafCols.push({ w: 80 }); leafCols.push({ w: 110 }); });
-    });
-  }
+  GROUPS.forEach(function (g) {
+    for (var bi = 0; bi < blocksPerGroup; bi++) { leafCols.push({ w: 110 }); if (!g.noUsers) leafCols.push({ w: 80 }); }
+  });
   html += '<div class="card mrr-card mrr-card-product" id="mrrProduct"><div class="toolbar"><b style="font-size:13px">Product breakdown</b>' +
     '<input type="search" id="q2" placeholder="Search client…" value="' + esc(state.search) + '" />' +
-    '<select id="prodFocusSel" title="Show one product\'s full 3-month trend">' +
-    '<option value="all"' + (focusedIsAll ? " selected" : "") + ">All products (summary)</option>" +
-    PRODUCTS.map(function (p) { return '<option value="' + p.key + '"' + (state.mrrProductFocus === p.key ? " selected" : "") + ">" + esc(p.label) + " (full trend)</option>"; }).join("") +
-    "</select>" +
-    '<span style="color:var(--ink-3);font-size:12px">Users + revenue, ' + esc(trendMonths[0].label) + ' → ' + esc(trendMonths[2].label) + '</span></div>';
+    '<span style="color:var(--ink-3);font-size:12px">Revenue + Users, ' + esc(trendMonths[0].label) + ' → ' + esc(trendMonths[2].label) +
+    ' · Difference = ' + esc(trendMonths[2].label) + ' vs ' + esc(trendMonths[1].label) + '</span></div>';
   html += '<div class="grid-wrap" id="gw2"><table class="grid">' +
     "<colgroup>" + leafCols.map(function (c) { return '<col style="width:' + c.w + 'px">'; }).join("") + "</colgroup>" +
     '<thead><tr class="hdr-row hdr-batch-row">' +
-    '<th class="rownum" rowspan="2"></th>' +
-    '<th class="lbl sticky-l" rowspan="2">Client</th>' +
-    '<th class="num hdr-batch-total" colspan="' + (trendMonths.length * 2) + '">Total</th>' +
-    (focusedIsAll
-      ? PRODUCTS.map(function (p) { return '<th class="num batch-' + p.color + ' grp-edge" rowspan="2">' + esc(p.label) + "</th>"; }).join("")
-      : focusedProducts.map(function (p) {
-        return '<th class="num batch-' + p.color + ' grp-edge" colspan="' + ((p.noUsers ? 1 : 2) * trendMonths.length) + '">' + esc(p.label) + " — full trend</th>";
-      }).join("")) +
-    '</tr><tr class="hdr-row hdr-subrow">' +
-    trendMonths.map(function (m) {
-      return '<th class="num">' + esc(m.label) + ' Users</th>' +
-        '<th class="num">' + esc(m.label) + ' Revenue</th>';
+    '<th class="rownum" rowspan="3"></th>' +
+    '<th class="lbl sticky-l" rowspan="3">Client</th>' +
+    GROUPS.map(function (g) {
+      var cls = g.key === "total" ? "hdr-batch-total" : "batch-" + g.color;
+      return '<th class="num ' + cls + ' grp-edge" colspan="' + ((g.noUsers ? 1 : 2) * blocksPerGroup) + '">' + esc(g.label) + "</th>";
     }).join("") +
-    (focusedIsAll ? "" : focusedProducts.map(function (p) {
+    '</tr><tr class="hdr-row hdr-monthrow">' +
+    GROUPS.map(function (g) {
+      var cls = g.key === "total" ? "hdr-batch-total" : "batch-" + g.color;
       return trendMonths.map(function (m, mi) {
-        var edge = mi === 0 ? " grp-edge" : "";
-        return (p.noUsers ? "" : '<th class="num batch-' + p.color + edge + '">' + esc(m.label) + ' Users</th>') +
-          '<th class="num batch-' + p.color + (p.noUsers ? edge : "") + '">' + esc(m.label) + ' Revenue</th>';
-      }).join("");
-    }).join("")) +
+        return '<th class="num ' + cls + (mi === 0 ? " grp-edge" : "") + '" colspan="' + (g.noUsers ? 1 : 2) + '">' + esc(m.label) + "</th>";
+      }).join("") + '<th class="num ' + cls + ' grp-edge diff-hdr" colspan="' + (g.noUsers ? 1 : 2) + '">Difference</th>';
+    }).join("") +
+    '</tr><tr class="hdr-row hdr-subrow">' +
+    GROUPS.map(function (g) {
+      var mkPair = function (isDiff, first) {
+        return '<th class="num' + (first ? " grp-edge" : "") + (isDiff ? " diff-hdr" : "") + '">Revenue</th>' +
+          (g.noUsers ? "" : '<th class="num' + (isDiff ? " diff-hdr" : "") + '">Users</th>');
+      };
+      return trendMonths.map(function (m, mi) { return mkPair(false, mi === 0); }).join("") + mkPair(true, true);
+    }).join("") +
     "</tr></thead><tbody id=\"tb2\">";
   if (!rows.length) {
-    html += '<tr><td colspan="' + (2 + trendMonths.length * 2 + prodColCount) + '" style="padding:26px;text-align:center;color:var(--ink-3)">No matching clients.</td></tr>';
+    html += '<tr><td colspan="' + (2 + GROUPS.reduce(function (n, g) { return n + (g.noUsers ? 1 : 2) * blocksPerGroup; }, 0)) + '" style="padding:26px;text-align:center;color:var(--ink-3)">No matching clients.</td></tr>';
   }
   html += '</tbody></table><div class="sentinel" aria-hidden="true"></div></div>' +
     (rows.length ? loadMoreHTML(rows.length, false) : "") + "</div>";
@@ -398,30 +398,26 @@ export function renderMrrMovement() {
         var r = rows[i];
         out += '<tr><td class="rownum">' + (i + 1) + "</td>" +
           '<td class="sticky-l cname" title="' + esc(r.name) + '">' + esc(r.name) + "</td>" +
-          r.trend.map(function (t) {
-            return '<td class="num ' + (t.users < 0.5 ? "zero" : "") + '">' + Math.round(t.users).toLocaleString("en-IN") + "</td>" +
-              '<td class="num ' + (Math.abs(t.revenue) < 0.5 ? "zero" : "") + '">' + inr(t.revenue) + "</td>";
+          GROUPS.map(function (g) {
+            var series = seriesFor(r, g), diff = diffFor(r, g);
+            var batchCls = g.key === "total" ? "" : " batch-" + g.color;
+            var cellHTML = function (v, isDiff, first, isUsers) {
+              var cls = "num" + batchCls + (first ? " grp-edge" : "") + (isDiff ? " diff-cell" : "");
+              var neg = v < -0.5, zero = Math.abs(v) < 0.5;
+              var disp, prefix = "";
+              if (isUsers) {
+                disp = Math.round(Math.abs(v)).toLocaleString("en-IN");
+                if (isDiff && !zero) prefix = neg ? "-" : "+";
+              } else {
+                disp = inr(v);   // inr() already renders its own "-" for a negative value
+                if (isDiff && !zero && !neg) prefix = "+";
+              }
+              return '<td class="' + cls + (zero ? " zero" : (isDiff && neg) ? " neg" : "") + '">' + prefix + disp + "</td>";
+            };
+            return series.map(function (m, mi) {
+              return cellHTML(m.revenue, false, mi === 0, false) + (g.noUsers ? "" : cellHTML(m.users, false, false, true));
+            }).join("") + cellHTML(diff.revenue, true, true, false) + (g.noUsers ? "" : cellHTML(diff.users, true, false, true));
           }).join("") +
-          (focusedIsAll
-            ? PRODUCTS.map(function (pr, pi) {
-              /* Key-value pair, one cell: revenue + user count together,
-                 latest month only — this is the "summary" a client scans
-                 fast; the full per-month breakdown is one dropdown pick
-                 away instead of always taking up five groups of columns. */
-              var latest = r.prod[pi][r.prod[pi].length - 1];
-              var empty = Math.abs(latest.revenue) < 0.5;
-              return '<td class="num batch-' + pr.color + ' grp-edge ' + (empty ? "zero" : "") + '">' +
-                inrShort(latest.revenue) + (pr.noUsers || empty ? "" : '<span class="prod-users"> · ' + Math.round(latest.users).toLocaleString("en-IN") + "u</span>") +
-                "</td>";
-            }).join("")
-            : focusedProducts.map(function (pr) {
-              var pi = PRODUCTS.indexOf(pr);
-              return r.prod[pi].map(function (p, mi) {
-                var edge = mi === 0 ? " grp-edge" : "";
-                return (pr.noUsers ? "" : '<td class="num batch-' + pr.color + edge + ' ' + (p.users < 0.5 ? "zero" : "") + '">' + Math.round(p.users).toLocaleString("en-IN") + "</td>") +
-                  '<td class="num batch-' + pr.color + (pr.noUsers ? edge : "") + " " + (p.revenue < 0.5 ? "zero" : "") + '">' + inr(p.revenue) + "</td>";
-              }).join("");
-            }).join("")) +
           "</tr>";
       }
       return out;
@@ -430,8 +426,6 @@ export function renderMrrMovement() {
 
   var moveSel = view.querySelector("#moveSel");
   if (moveSel) moveSel.addEventListener("change", function () { state.mrrMoveFilter = moveSel.value; render(); });
-  var prodFocusSel = view.querySelector("#prodFocusSel");
-  if (prodFocusSel) prodFocusSel.addEventListener("change", function () { state.mrrProductFocus = prodFocusSel.value; render(); });
   var mA = view.querySelector("#monthASel"), mB = view.querySelector("#monthBSel");
   if (mA) mA.addEventListener("change", function () { state.mrrA = mA.value; render(); });
   if (mB) mB.addEventListener("change", function () { state.mrrB = mB.value; render(); });
