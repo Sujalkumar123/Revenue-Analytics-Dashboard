@@ -75,6 +75,7 @@ export var LEDGER_COLS = [
   { label: "Item Description", f: "desc", edit: true, w: 300 },
   { label: "One-time / Recurring", f: "rec", edit: true, w: 150 },
   { label: "User Count", f: "users", num: true, edit: true, w: 100 },
+  { label: "Rate / User", f: "rate", num: true, edit: true, w: 110 },
   { label: "Start Date", f: "start", edit: true, w: 112 },
   { label: "End Date", f: "end", edit: true, w: 112 },
   { label: "Amount", f: "amount", num: true, edit: true, w: 125 }

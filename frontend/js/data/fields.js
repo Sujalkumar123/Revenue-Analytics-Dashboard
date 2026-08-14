@@ -34,6 +34,11 @@ export function fieldVal(ds, sheet, ri, field) {
     case "start": return fmtDate(r[8]);
     case "end": return fmtDate(r[9]);
     case "amount": return r[10];
+    case "rate": {
+      var u = parseFloat(fieldVal(ds, sheet, ri, "users")) || 0;
+      if (u <= 0) return "";
+      return Math.round((effAmount(ds, sheet, ri) / u) * 100) / 100;
+    }
   }
   return "";
 }

@@ -131,7 +131,7 @@ export function renderLedger(opts) {
       '<td class="rownum" title="Click to select this row · Ctrl+click to add another">' + rank + "</td>" +
       cols.map(function (c, ci) {
         var val = fieldVal(ds, sheet, ri, c.f);
-        var disp = c.f === "amount" ? inr(val) : val;
+        var disp = (c.f === "amount" || c.f === "rate") ? inr(val) : val;
         var ed = isEdited(sheet, ri, c.f);
         return '<td data-sel="1" class="' + (c.num ? "num " : "") + (ci === 0 ? "sticky-l " : "") +
           (c.f === "client" ? "cname " : "") + (c.edit ? "editable " : "") + (ed ? "edited" : "") + '"' +
@@ -165,6 +165,26 @@ export function renderLedger(opts) {
       var orig = (td.getAttribute("data-orig") || "").trim();
       if (nv === orig) return;
       var ri = +td.getAttribute("data-ri"), field = td.getAttribute("data-f");
+      /* Rate isn't a stored field — it's Amount / User Count. Editing it
+         is really editing Amount by way of a formula, so the edit lands
+         on "amount" (recomputed as rate * current users) instead of a
+         "rate" key fieldVal would never read back. Requires an actual
+         user count on the row; on a 0-user row there's nothing to solve
+         rate*users=amount for, so the edit is a no-op there. */
+      if (field === "rate") {
+        var u = parseFloat(fieldVal(ds, sheet, ri, "users")) || 0;
+        var rate = parseFloat(String(nv).replace(/[^0-9.\-]/g, ""));
+        if (u <= 0 || isNaN(rate)) return;
+        var newAmount = Math.round(rate * u * 100) / 100;
+        var prevAmount = getEdit(sheet, ri, "amount");
+        HISTORY.perform({
+          label: "edit rate on row " + ri,
+          apply: function () { setEdit(sheet, ri, "amount", newAmount); },
+          revert: function () { if (prevAmount === undefined) EDITS.del(editKey(sheet, ri, "amount")); else setEdit(sheet, ri, "amount", prevAmount); }
+        });
+        render();
+        return;
+      }
       var prev = getEdit(sheet, ri, field);   // undefined if not edited before
       HISTORY.perform({
         label: "edit " + field + " on row " + ri,
