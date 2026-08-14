@@ -61,6 +61,7 @@ function buildChrome() {
     var b = e.target.closest("[data-tab]");
     if (!b) return;
     state.tab = b.getAttribute("data-tab");
+    try { localStorage.setItem("ra_last_tab", state.tab); } catch (err) {}
     state.search = ""; state.flagOnly = false;
     nav.querySelectorAll("[data-tab]").forEach(function (x) {
       x.setAttribute("aria-selected", x.getAttribute("data-tab") === state.tab);

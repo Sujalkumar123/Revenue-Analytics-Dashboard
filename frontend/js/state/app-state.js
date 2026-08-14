@@ -8,8 +8,17 @@ import { FYS } from "../core/dates.js";
 export var S = { consol: null, credit: null, dims: null, invoiceDump: null, creditNoteDump: null };
 export var readyFlag = { value: false };
 
+var TAB_IDS = ["mrr", "recurr", "consol", "invoice", "creditworking", "credit", "onetime"];
+function lastTab() {
+  try {
+    var saved = localStorage.getItem("ra_last_tab");
+    if (saved && TAB_IDS.indexOf(saved) !== -1) return saved;
+  } catch (e) {}
+  return "recurr";
+}
+
 export var state = {
-  tab: "recurr", fy: "2024-25", metric: "net", search: "", sort: "total_desc", flagOnly: false, provFilter: "all",
+  tab: lastTab(), fy: "2024-25", metric: "net", search: "", sort: "total_desc", flagOnly: false, provFilter: "all",
   /* MRR Movement's own two-month picker — null means "not chosen yet",
      resolved to the two most recent months with data on first render. */
   mrrA: null, mrrB: null, mrrMoveFilter: "all", mrrTierMetric: "mrr"
