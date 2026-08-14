@@ -446,38 +446,35 @@ main > .card.mrr-card-tier .toolbar{background:var(--new-soft)}
    cells get the full-strength tint + colored text; body cells get a much
    fainter version of the same color so the figures stay legible. */
 table.grid thead tr.hdr-row th.batch-accent{background:var(--accent-soft);color:var(--accent)}
-td.batch-accent{background:color-mix(in srgb, var(--accent-soft) 55%, var(--panel))}
+td.batch-accent{background:color-mix(in srgb, var(--accent-soft) 32%, var(--panel))}
 table.grid thead tr.hdr-row th.batch-gold{background:var(--gold-soft);color:var(--gold)}
-td.batch-gold{background:color-mix(in srgb, var(--gold-soft) 55%, var(--panel))}
+td.batch-gold{background:color-mix(in srgb, var(--gold-soft) 32%, var(--panel))}
 table.grid thead tr.hdr-row th.batch-good{background:var(--new-soft);color:var(--good)}
-td.batch-good{background:color-mix(in srgb, var(--new-soft) 55%, var(--panel))}
+td.batch-good{background:color-mix(in srgb, var(--new-soft) 32%, var(--panel))}
 table.grid thead tr.hdr-row th.batch-edit{background:var(--edit-soft);color:var(--edit)}
-td.batch-edit{background:color-mix(in srgb, var(--edit-soft) 55%, var(--panel))}
+td.batch-edit{background:color-mix(in srgb, var(--edit-soft) 32%, var(--panel))}
 table.grid thead tr.hdr-row th.batch-ink3{background:var(--surface-2);color:var(--ink-2)}
-td.batch-ink3{background:var(--surface-2)}
+td.batch-ink3{background:color-mix(in srgb, var(--surface-2) 60%, var(--panel))}
 table.grid thead tr.hdr-row th.hdr-batch-total{background:var(--surface-3);color:var(--ink-2)}
 /* the even-row zebra stripe would otherwise fight the batch tint on every
    other row — batch color wins, since it's the thing being scanned for */
-tbody tr:nth-child(even) td.batch-accent{background:color-mix(in srgb, var(--accent-soft) 55%, var(--panel))}
-tbody tr:nth-child(even) td.batch-gold{background:color-mix(in srgb, var(--gold-soft) 55%, var(--panel))}
-tbody tr:nth-child(even) td.batch-good{background:color-mix(in srgb, var(--new-soft) 55%, var(--panel))}
-tbody tr:nth-child(even) td.batch-edit{background:color-mix(in srgb, var(--edit-soft) 55%, var(--panel))}
-tbody tr:nth-child(even) td.batch-ink3{background:var(--surface-2)}
+tbody tr:nth-child(even) td.batch-accent{background:color-mix(in srgb, var(--accent-soft) 32%, var(--panel))}
+tbody tr:nth-child(even) td.batch-gold{background:color-mix(in srgb, var(--gold-soft) 32%, var(--panel))}
+tbody tr:nth-child(even) td.batch-good{background:color-mix(in srgb, var(--new-soft) 32%, var(--panel))}
+tbody tr:nth-child(even) td.batch-edit{background:color-mix(in srgb, var(--edit-soft) 32%, var(--panel))}
+tbody tr:nth-child(even) td.batch-ink3{background:color-mix(in srgb, var(--surface-2) 60%, var(--panel))}
 
 /* The group-name row (product shown once, spanning its own Users+Revenue
-   pair) is a solid ribbon in the product's own color, not another soft
-   tint — this is the thing meant to be read at a glance, so it gets full
-   saturation + white text rather than blending in like the row below it. */
-table.grid thead tr.hdr-row.hdr-batch-row th{text-align:center;font-size:11px}
-table.grid thead tr.hdr-row.hdr-batch-row th.batch-accent{background:var(--accent);color:#fff}
-table.grid thead tr.hdr-row.hdr-batch-row th.batch-gold{background:var(--gold);color:#fff}
-table.grid thead tr.hdr-row.hdr-batch-row th.batch-good{background:var(--good);color:#fff}
-table.grid thead tr.hdr-row.hdr-batch-row th.batch-edit{background:var(--edit);color:#fff}
-table.grid thead tr.hdr-row.hdr-batch-row th.batch-ink3{background:var(--ink-2);color:#fff}
-table.grid thead tr.hdr-row.hdr-batch-row th.hdr-batch-total{background:var(--ink-2);color:#fff}
-/* A hard vertical rule at every group boundary — doesn't rely on the tint
-   being noticed at all, holds up even at a glance or on a dim screen. */
-.grp-edge{border-left:2px solid var(--border-strong)}
+   pair) keeps the same soft tint as the rows below it — a plain gridline
+   at the group boundary is what separates groups, not a block of solid
+   color, so the whole header reads as one light spreadsheet-style grid
+   rather than a stack of colored ribbons. Bold text + a slightly larger
+   size is what makes the group name the thing read first. */
+table.grid thead tr.hdr-row.hdr-batch-row th{text-align:center;font-size:11.5px;font-weight:700}
+table.grid thead tr.hdr-row.hdr-batch-row th.hdr-batch-total{background:var(--surface-2);color:var(--ink-2)}
+/* A thin vertical rule at every group boundary — enough to separate groups
+   without the heavy 2px rule of the old ribbon design. */
+.grp-edge{border-left:1px solid var(--border)}
 /* Three stacked sticky header rows can't all sit at top:0 — each would
    overlap the last instead of cascading below it. The base rule (one
    header row per table, the normal case everywhere else) sets top:0 for
@@ -485,13 +482,13 @@ table.grid thead tr.hdr-row.hdr-batch-row th.hdr-batch-total{background:var(--in
    sticks below both. */
 table.grid thead tr.hdr-row.hdr-monthrow th{top:34px}
 table.grid thead tr.hdr-row.hdr-subrow th{top:68px}
-/* The Difference block closing out every group — a lighter dashed
-   left-border sets it apart from the three month blocks beside it without
-   a fourth color, and the value itself uses the app's existing
-   positive/negative convention (green "+", red for a decline) rather than
-   just another neutral number. */
-.diff-hdr{border-left:2px dashed var(--border-strong)!important}
-td.diff-cell{border-left:2px dashed var(--border-strong);font-weight:650}
+/* The Difference block closing out every group — a thin dashed left-border
+   sets it apart from the three month blocks beside it without a fourth
+   color, and the value itself uses the app's existing positive/negative
+   convention (green "+", red for a decline) rather than just another
+   neutral number. */
+.diff-hdr{border-left:1px dashed var(--border-strong)!important}
+td.diff-cell{border-left:1px dashed var(--border-strong);font-weight:650}
 td.diff-cell:not(.zero):not(.neg){color:var(--good)}
 
 .load-more{display:flex;align-items:center;padding:9px 14px;
