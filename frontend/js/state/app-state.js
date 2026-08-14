@@ -25,7 +25,10 @@ export var state = {
   /* Product breakdown's own 3-month trend picker — null means "not chosen
      yet", each defaults to trailing off Bridge's Month B (Month B and the
      two months before it) until the admin picks something else. */
-  mrrTrend1: null, mrrTrend2: null, mrrTrend3: null
+  mrrTrend1: null, mrrTrend2: null, mrrTrend3: null,
+  /* Tier summary's FY picker — null means "not chosen yet", defaults to
+     whichever FY Bridge's Month B falls in. */
+  mrrTierFY: null
 };
 
 export var TABS = [

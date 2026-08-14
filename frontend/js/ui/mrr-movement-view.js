@@ -14,7 +14,7 @@
    ledger — nothing in that half of the grid is a manual override. */
 "use strict";
 
-import { fyMonths } from "../core/dates.js";
+import { fyMonths, FYS } from "../core/dates.js";
 import { inr, inrShort, esc } from "../core/format.js";
 import { aggregate, aggregateUsers, onlyRecurring, computeProvisional, recurringProduct } from "../data/revenue.js";
 import { state, S } from "../state/app-state.js";
@@ -186,12 +186,32 @@ export function renderMrrMovement() {
   });
 
   /* Third section: the Summary sheet's own view — MRR, Users and ARPU
-     trended by Tier over a trailing 12 months (ending at Month B), ARPU
-     being the formula the sheet used it for: MRR / Users. Independent of
-     the bridge's search/movement filter above (a segment rollup shouldn't
+     trended by Tier across a picked financial year (Apr-Mar), ARPU being
+     the formula the sheet used it for: MRR / Users. Independent of the
+     bridge's search/movement filter above (a segment rollup shouldn't
      change because the client list happens to be filtered to "Churned"),
-     but built from the same resolved()/provisional-aware totals. */
-  var tierIdx = []; for (var ti = Math.max(0, idxB - 11); ti <= idxB; ti++) tierIdx.push(ti);
+     but built from the same resolved()/provisional-aware totals.
+     REAL_FYS excludes the "all years" entry — months[] (fyMonths({y:null}))
+     starts at that same earliest FY's April and runs continuously, so each
+     FY's 12 months land at a fixed, non-overlapping 12-index block: FY
+     2022-23 is indices 0-11, 2023-24 is 12-23, and so on — no separate
+     month-label lookup needed, just arithmetic off the FY's start year. */
+  var REAL_FYS = FYS.filter(function (f) { return f.y !== null; });
+  var EARLIEST_FY_YEAR = REAL_FYS[0].y;
+  function fyIdxRange(fyId) {
+    var fy = REAL_FYS.filter(function (f) { return f.id === fyId; })[0];
+    if (!fy) return null;
+    var start = (fy.y - EARLIEST_FY_YEAR) * 12;
+    if (start >= months.length) return null;
+    var end = Math.min(start + 11, months.length - 1);
+    var out = []; for (var i = start; i <= end; i++) out.push(i);
+    return out;
+  }
+  var defaultTierFY = REAL_FYS.filter(function (f) {
+    var r = fyIdxRange(f.id); return r && idxB >= r[0] && idxB <= r[r.length - 1];
+  })[0] || REAL_FYS[REAL_FYS.length - 1];
+  var tierFYId = state.mrrTierFY && fyIdxRange(state.mrrTierFY) ? state.mrrTierFY : defaultTierFY.id;
+  var tierIdx = fyIdxRange(tierFYId);
   var tierMonths = tierIdx.map(function (i) { return months[i]; });
   var TIER_ROWS = TIERS.concat(["Unclassified"]);
   var tierData = {};
@@ -336,8 +356,11 @@ export function renderMrrMovement() {
   html += '</tbody></table><div class="sentinel" aria-hidden="true"></div></div>' +
     (rows.length ? loadMoreHTML(rows.length, false) : "") + "</div>";
 
-  /* Section 3: MRR / Users / ARPU by Tier, trailing 12 months. */
+  /* Section 3: MRR / Users / ARPU by Tier, for a picked financial year. */
   html += '<div class="card mrr-card mrr-card-tier" id="mrrTier"><div class="toolbar"><b style="font-size:13px">Tier summary</b>' +
+    '<select id="tierFYSel" title="Financial year">' +
+    REAL_FYS.map(function (f) { return '<option value="' + f.id + '"' + (f.id === tierFYId ? " selected" : "") + ">" + esc(f.label) + "</option>"; }).join("") +
+    "</select>" +
     '<div class="seg" role="group" aria-label="Tier metric">' +
     '<button data-tiermetric="mrr" aria-pressed="' + (state.mrrTierMetric === "mrr") + '">MRR</button>' +
     '<button data-tiermetric="users" aria-pressed="' + (state.mrrTierMetric === "users") + '">Users</button>' +
@@ -497,6 +520,8 @@ export function renderMrrMovement() {
   if (tSel0) tSel0.addEventListener("change", function () { state.mrrTrend1 = tSel0.value; render(); });
   if (tSel1) tSel1.addEventListener("change", function () { state.mrrTrend2 = tSel1.value; render(); });
   if (tSel2) tSel2.addEventListener("change", function () { state.mrrTrend3 = tSel2.value; render(); });
+  var tierFYSel = view.querySelector("#tierFYSel");
+  if (tierFYSel) tierFYSel.addEventListener("change", function () { state.mrrTierFY = tierFYSel.value; render(); });
   view.querySelectorAll("[data-tiermetric]").forEach(function (b) {
     b.addEventListener("click", function () { state.mrrTierMetric = b.getAttribute("data-tiermetric"); render(); });
   });
