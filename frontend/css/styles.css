@@ -477,6 +477,10 @@ table.grid thead tr.hdr-row.hdr-batch-row th.hdr-batch-total{background:var(--in
 /* A hard vertical rule at every group boundary — doesn't rely on the tint
    being noticed at all, holds up even at a glance or on a dim screen. */
 .grp-edge{border-left:2px solid var(--border-strong)}
+/* The "All products" summary cell's user count — a quieter second half of
+   the same key-value pair, not competing with the revenue figure it rides
+   along with. */
+.prod-users{color:var(--ink-3);font-size:10.5px;font-weight:600}
 /* Two sticky header rows can't both sit at top:0 — they'd stack on top of
    each other instead of cascading. The base rule (one header row per
    table, the normal case everywhere else) sets top:0 for every
