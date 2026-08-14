@@ -32,7 +32,7 @@ export var state = {
 };
 
 export var TABS = [
-  { id: "mrr",            label: "MRR Movement" },
+  { id: "mrr",            label: "MRR" },
   { id: "recurr",        label: "Recurring Revenue" },
   { id: "consol",        label: "Invoice working" },
   { id: "invoice",       label: "Invoice Dump" },
