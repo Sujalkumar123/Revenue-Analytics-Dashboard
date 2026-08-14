@@ -142,7 +142,9 @@ export function renderMrrMovement() {
     });
     r.prod = prodMaps.map(function (pm) {
       var g = pm.gross.get(r.name), u = pm.users.get(r.name);
-      return { revenue: g ? (g[idxB] || 0) : 0, users: u ? (u[idxB] || 0) : 0 };
+      return trendIdx.map(function (idx) {
+        return { revenue: g ? (g[idx] || 0) : 0, users: u ? (u[idx] || 0) : 0 };
+      });
     });
   });
 
@@ -236,23 +238,29 @@ export function renderMrrMovement() {
     (rows.length ? loadMoreHTML(rows.length, true) : "") + "</div>";
 
   /* Section 2: 3-month trend of total Users + Revenue, then a per-product
-     Users + Revenue snapshot for the latest month (Other modules is
-     revenue-only, matching the source sheet — see the PRODUCTS comment).
+     Users + Revenue trended across the same 3 months as Total (Other
+     modules is revenue-only, matching the source sheet — see the
+     PRODUCTS comment) — matches the source sheet's own layout exactly,
+     where every product block trends the same months the Total block
+     does, not just a single latest-month snapshot.
      A plain background tint on the leaf columns (first attempt) turned
      out too subtle to read as "one group" scanning fast — this now has a
      real two-row header, product name shown ONCE in a solid-color band
-     spanning its own Users+Revenue pair, plus a divider border at every
-     group boundary, so the grouping doesn't depend on noticing a faint
-     tint at all. table-layout:fixed takes its column widths from a
-     <colgroup>, since a colspanned header cell can't carry a leaf width. */
-  var prodColCount = PRODUCTS.reduce(function (n, p) { return n + (p.noUsers ? 1 : 2); }, 0);
+     spanning its own months, plus a divider border at every group
+     boundary, so the grouping doesn't depend on noticing a faint tint at
+     all. table-layout:fixed takes its column widths from a <colgroup>,
+     since a colspanned header cell can't carry a leaf width. */
+  var prodMonthCols = trendMonths.length;   // each product repeats the same 3-month trend as Total
+  var prodColCount = PRODUCTS.reduce(function (n, p) { return n + (p.noUsers ? 1 : 2) * prodMonthCols; }, 0);
   var leafCols = [{ w: 38 }, { w: 270 }];
   trendMonths.forEach(function () { leafCols.push({ w: 90 }, { w: 110 }); });
-  PRODUCTS.forEach(function (p) { if (!p.noUsers) leafCols.push({ w: 80 }); leafCols.push({ w: 110 }); });
+  PRODUCTS.forEach(function (p) {
+    trendMonths.forEach(function () { if (!p.noUsers) leafCols.push({ w: 80 }); leafCols.push({ w: 110 }); });
+  });
   html += '<div class="card mrr-card mrr-card-product" id="mrrProduct"><div class="toolbar"><b style="font-size:13px">Product breakdown</b>' +
     '<input type="search" id="q2" placeholder="Search client…" value="' + esc(state.search) + '" />' +
     '<span style="color:var(--ink-3);font-size:12px">Users + revenue trend ' + esc(trendMonths[0].label) +
-    ' → ' + esc(trendMonths[2].label) + ' · products as of ' + esc(monthB.label) + '</span></div>';
+    ' → ' + esc(trendMonths[2].label) + ' · Total and every product</span></div>';
   html += '<div class="grid-wrap" id="gw2"><table class="grid">' +
     "<colgroup>" + leafCols.map(function (c) { return '<col style="width:' + c.w + 'px">'; }).join("") + "</colgroup>" +
     '<thead><tr class="hdr-row hdr-batch-row">' +
@@ -260,7 +268,7 @@ export function renderMrrMovement() {
     '<th class="lbl sticky-l" rowspan="2">Client</th>' +
     '<th class="num hdr-batch-total" colspan="' + (trendMonths.length * 2) + '">Total</th>' +
     PRODUCTS.map(function (p) {
-      return '<th class="num batch-' + p.color + ' grp-edge" colspan="' + (p.noUsers ? 1 : 2) + '">' + esc(p.label) + "</th>";
+      return '<th class="num batch-' + p.color + ' grp-edge" colspan="' + ((p.noUsers ? 1 : 2) * prodMonthCols) + '">' + esc(p.label) + "</th>";
     }).join("") +
     '</tr><tr class="hdr-row hdr-subrow">' +
     trendMonths.map(function (m) {
@@ -268,8 +276,11 @@ export function renderMrrMovement() {
         '<th class="num">' + esc(m.label) + ' Revenue</th>';
     }).join("") +
     PRODUCTS.map(function (p) {
-      return (p.noUsers ? "" : '<th class="num batch-' + p.color + ' grp-edge">Users</th>') +
-        '<th class="num batch-' + p.color + (p.noUsers ? " grp-edge" : "") + '">Revenue</th>';
+      return trendMonths.map(function (m, mi) {
+        var edge = mi === 0 ? " grp-edge" : "";
+        return (p.noUsers ? "" : '<th class="num batch-' + p.color + edge + '">' + esc(m.label) + ' Users</th>') +
+          '<th class="num batch-' + p.color + (p.noUsers ? edge : "") + '">' + esc(m.label) + ' Revenue</th>';
+      }).join("");
     }).join("") +
     "</tr></thead><tbody id=\"tb2\">";
   if (!rows.length) {
@@ -384,10 +395,13 @@ export function renderMrrMovement() {
             return '<td class="num ' + (t.users < 0.5 ? "zero" : "") + '">' + Math.round(t.users).toLocaleString("en-IN") + "</td>" +
               '<td class="num ' + (Math.abs(t.revenue) < 0.5 ? "zero" : "") + '">' + inr(t.revenue) + "</td>";
           }).join("") +
-          r.prod.map(function (p, pi) {
+          r.prod.map(function (pTrend, pi) {
             var pr = PRODUCTS[pi];
-            return (pr.noUsers ? "" : '<td class="num batch-' + pr.color + ' grp-edge ' + (p.users < 0.5 ? "zero" : "") + '">' + Math.round(p.users).toLocaleString("en-IN") + "</td>") +
-              '<td class="num batch-' + pr.color + (pr.noUsers ? " grp-edge" : "") + " " + (p.revenue < 0.5 ? "zero" : "") + '">' + inr(p.revenue) + "</td>";
+            return pTrend.map(function (p, mi) {
+              var edge = mi === 0 ? " grp-edge" : "";
+              return (pr.noUsers ? "" : '<td class="num batch-' + pr.color + edge + ' ' + (p.users < 0.5 ? "zero" : "") + '">' + Math.round(p.users).toLocaleString("en-IN") + "</td>") +
+                '<td class="num batch-' + pr.color + (pr.noUsers ? edge : "") + " " + (p.revenue < 0.5 ? "zero" : "") + '">' + inr(p.revenue) + "</td>";
+            }).join("");
           }).join("") +
           "</tr>";
       }
