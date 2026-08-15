@@ -4,15 +4,25 @@ for the Invoice Dump tab's read-only raw view.
 
 This is deliberately separate from consol.json: Consol Sheet/Recurring
 Revenue keep using their own existing dataset (product classification,
-recurring flag, service period) untouched. Invoice Dump is just a faithful
-mirror of what Zoho actually exported — no revenue recognition, no
-reclassification.
+recurring flag, service period) untouched — see merge_consol_from_dump.py
+for bringing a refresh into that side too.
 
-Run:  py -3 scripts/build_invoice_dump.py "<path to Invoice export.xlsx>"
+A source export is usually a partial window (e.g. "last 4 months", not
+"everything since 2022"), so this MERGES into the existing
+invoicedump.json by default: rows dated on/after --cutoff are replaced
+with the new export's rows, everything before is left alone. A blind
+overwrite here would silently delete years of history that just isn't in
+the new file — found the hard way once already. Pass --full-replace only
+if the source file genuinely is a complete re-export of everything.
+
+Run:  py -3 scripts/build_invoice_dump.py "<path to Invoice export.xlsx>" [--cutoff YYYY-MM-DD] [--full-replace]
+
+--cutoff defaults to the 1st of the earliest invoice date found in the
+source file itself.
 """
+import argparse
 import json
-import sys
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 
 import openpyxl
@@ -50,11 +60,23 @@ def fmt_num(v):
         return 0
 
 
+def parse_ddmonyy(s):
+    if not s:
+        return None
+    try:
+        return datetime.strptime(s.strip(), "%d-%b-%y").date()
+    except ValueError:
+        return None
+
+
 def main():
-    if len(sys.argv) < 2:
-        print("usage: py -3 scripts/build_invoice_dump.py <path to Invoice export.xlsx>")
-        sys.exit(1)
-    src = Path(sys.argv[1])
+    ap = argparse.ArgumentParser()
+    ap.add_argument("source", help="Path to the Invoice export .xlsx")
+    ap.add_argument("--cutoff", help="YYYY-MM-DD; defaults to the earliest invoice date in the source file")
+    ap.add_argument("--full-replace", action="store_true",
+                     help="Overwrite invoicedump.json entirely instead of merging by cutoff date")
+    args = ap.parse_args()
+    src = Path(args.source)
     out = Path(__file__).resolve().parent.parent / "frontend" / "data" / "invoicedump.json"
 
     wb = openpyxl.load_workbook(src, read_only=True, data_only=True)
@@ -66,6 +88,7 @@ def main():
         print("WARNING - columns not found in source file:", missing)
 
     rows = []
+    earliest = None
     for r in ws.iter_rows(min_row=2, values_only=True):
         if r[0] is None and (len(r) <= idx.get("Invoice Number", 1) or not r[idx.get("Invoice Number", 1)]):
             continue
@@ -82,14 +105,28 @@ def main():
             else:
                 row[key] = "" if v is None else str(v)
         rows.append(row)
+        d = row.get("invdate") and parse_ddmonyy(row["invdate"])
+        if d and (earliest is None or d < earliest):
+            earliest = d
+
+    if args.full_replace or not out.exists():
+        final_rows = rows
+        print(f"full replace: {len(rows)} rows")
+    else:
+        cutoff = date.fromisoformat(args.cutoff) if args.cutoff else date(earliest.year, earliest.month, 1)
+        old = json.loads(out.read_text(encoding="utf-8"))
+        kept = [r for r in old["rows"] if not (r.get("invdate") and (parse_ddmonyy(r["invdate"]) or date.max) >= cutoff)]
+        print(f"cutoff {cutoff.isoformat()}: kept {len(kept)} existing rows before it, "
+              f"replacing with {len(rows)} rows from the new export")
+        final_rows = kept + rows
 
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps({
         "cols": [k for k, _ in COLS],
         "labels": {k: label for k, label in COLS},
-        "rows": rows,
-    }), encoding="utf-8")
-    print(f"wrote {len(rows)} rows, {len(COLS)} columns -> {out}")
+        "rows": final_rows,
+    }, ensure_ascii=False), encoding="utf-8")
+    print(f"wrote {len(final_rows)} total rows, {len(COLS)} columns -> {out}")
 
 
 if __name__ == "__main__":

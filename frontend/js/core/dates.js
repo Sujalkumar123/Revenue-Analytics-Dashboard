@@ -52,7 +52,16 @@ export const FYS = [
      lookups elsewhere that assume the normal FYs stay in this order. */
   { id: "all", label: "All years", y: null }
 ];
-export const DATA_END = Date.UTC(2026, 5, 30);
+/* How far real data actually extends — every dropdown/grid's month range
+   is bounded by this, and computeProvisional() treats it as "today" for
+   deciding which months are past-due-for-an-invoice vs still upcoming.
+   Starts at a fallback (matters only before the ledger has loaded, or for
+   sample-data); main.js's loadData() calls setDataEnd() with the real
+   latest invoice date the moment the ledger arrives, so a fresh Invoice
+   Dump refresh (new months of data) extends every view's range on its
+   own — nothing here needs to be hand-edited when new data lands. */
+export var DATA_END = Date.UTC(2026, 5, 30);
+export function setDataEnd(utcMs) { DATA_END = utcMs; }
 var EARLIEST_FY_YEAR = FYS[0].y;
 
 export function fyMonths(fy) {

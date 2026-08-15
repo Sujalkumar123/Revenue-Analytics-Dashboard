@@ -4,6 +4,7 @@
 "use strict";
 
 import { esc } from "./core/format.js";
+import { EPOCH, DAY, setDataEnd } from "./core/dates.js";
 import { state, TABS, S, readyFlag } from "./state/app-state.js";
 import { AUTH, canEdit } from "./state/auth.js";
 import { runUndo, runRedo } from "./state/history.js";
@@ -162,6 +163,27 @@ function loadFrom(base) {
   ]);
 }
 
+/* The real extent of the data — end of the month containing the latest
+   invoice date across both ledgers — replaces dates.js's fallback DATA_END
+   the moment the ledger loads, so a fresh Invoice Dump refresh (new months
+   merged into consol.json) opens up that far in every dropdown/grid
+   without a hand edit anywhere. */
+function updateDataEnd() {
+  var maxDnum = -Infinity;
+  [S.consol, S.credit].forEach(function (ds) {
+    if (!ds || !ds.rows || !ds.rows.length) return;
+    var idx = ds.cols.indexOf("invdate");
+    if (idx === -1) return;
+    for (var i = 0; i < ds.rows.length; i++) {
+      var v = ds.rows[i][idx];
+      if (v !== null && v !== undefined && v > maxDnum) maxDnum = v;
+    }
+  });
+  if (maxDnum === -Infinity) return;
+  var d = new Date(EPOCH + maxDnum * DAY);
+  setDataEnd(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0));
+}
+
 function loadData() {
   loadFrom("data")
     .catch(function () {
@@ -172,6 +194,7 @@ function loadData() {
       S.consol = res[0]; S.credit = res[1]; S.dims = res[2]; S.invoiceDump = res[3]; S.creditNoteDump = res[4]; S.mrrSeed = res[5];
       applyAdds("consol", S.consol);
       applyAdds("credit", S.credit);
+      updateDataEnd();
       readyFlag.value = true;
       dataLoaded = true;
       render();
